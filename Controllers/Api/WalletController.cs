@@ -20,6 +20,16 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
+        /// Ping test endpoint
+        /// </summary>
+        [HttpGet("ping")]
+        [AllowAnonymous]
+        public IActionResult Ping()
+        {
+            return Ok("pong");
+        }
+
+        /// <summary>
         /// Get current user's wallet
         /// </summary>
         [HttpGet]

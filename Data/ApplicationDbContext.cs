@@ -55,10 +55,105 @@ namespace MentorEdu.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Map table names to existing snake_case names (match migrations / SQL Server)
+            modelBuilder.Entity<User>().ToTable("users");
+            modelBuilder.Entity<UserProfile>().ToTable("user_profiles");
+            modelBuilder.Entity<MentorProfile>().ToTable("mentor_profiles");
+            modelBuilder.Entity<Notification>().ToTable("notifications");
+
+            modelBuilder.Entity<Category>().ToTable("categories");
+            modelBuilder.Entity<Hashtag>().ToTable("hashtags");
+            modelBuilder.Entity<MentorCategory>().ToTable("mentor_categories");
+            modelBuilder.Entity<MentorHashtag>().ToTable("mentor_hashtags");
+
+            modelBuilder.Entity<Request>().ToTable("requests");
+            modelBuilder.Entity<Proposal>().ToTable("proposals");
+            modelBuilder.Entity<Order>().ToTable("orders");
+            modelBuilder.Entity<OrderDetail>().ToTable("order_details");
+
+            modelBuilder.Entity<WorkSession>().ToTable("work_sessions");
+            modelBuilder.Entity<SessionTracking>().ToTable("session_tracking");
+
+            modelBuilder.Entity<Conversation>().ToTable("conversations");
+            modelBuilder.Entity<Message>().ToTable("messages");
+            modelBuilder.Entity<MessageFile>().ToTable("message_files");
+
+            modelBuilder.Entity<Wallet>().ToTable("wallets");
+            modelBuilder.Entity<Transaction>().ToTable("transactions");
+            modelBuilder.Entity<Escrow>().ToTable("escrows");
+
+            modelBuilder.Entity<Review>().ToTable("reviews");
+            modelBuilder.Entity<Report>().ToTable("reports");
+
+            modelBuilder.Entity<CommunityPost>().ToTable("community_posts");
+            modelBuilder.Entity<CommunityComment>().ToTable("community_comments");
+
             // User - Unique Email
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            // Configure decimal precision/column types to match SQL Server migration
+            modelBuilder.Entity<MentorProfile>()
+                .Property(mp => mp.HourlyRate)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<MentorProfile>()
+                .Property(mp => mp.PackagePrice)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<MentorProfile>()
+                .Property(mp => mp.RatingAvg)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.AgreedPrice)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.AgreedHourlyRate)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Order>()
+                .Property(o => o.TotalPrice)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Proposal>()
+                .Property(p => p.Price)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Proposal>()
+                .Property(p => p.EstimatedHours)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Request>()
+                .Property(r => r.ExpectedBudget)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Request>()
+                .Property(r => r.ExpectedHours)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Transaction>()
+                .Property(t => t.Amount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Wallet>()
+                .Property(w => w.Balance)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Wallet>()
+                .Property(w => w.LockedBalance)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Escrow>()
+                .Property(e => e.Amount)
+                .HasColumnType("decimal(18,2)");
+
+            // Notification.Data store as nvarchar(max) (SQL Server does not have native json type)
+            modelBuilder.Entity<Notification>()
+                .Property(n => n.Data)
+                .HasColumnType("nvarchar(max)");
 
             // UserProfile - One-to-One with User
             modelBuilder.Entity<UserProfile>()
@@ -147,7 +242,7 @@ namespace MentorEdu.Data
                 .HasOne(p => p.Request)
                 .WithMany(r => r.Proposals)
                 .HasForeignKey(p => p.RequestId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             // Order - Multiple FKs to User
             modelBuilder.Entity<Order>()
@@ -166,13 +261,13 @@ namespace MentorEdu.Data
                 .HasOne(o => o.Request)
                 .WithMany(r => r.Orders)
                 .HasForeignKey(o => o.RequestId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.Proposal)
                 .WithMany(p => p.Orders)
                 .HasForeignKey(o => o.ProposalId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             // Escrow - One-to-One with Order
             modelBuilder.Entity<Escrow>()
@@ -268,13 +363,6 @@ namespace MentorEdu.Data
                 .HasOne(cc => cc.Post)
                 .WithMany(cp => cp.Comments)
                 .HasForeignKey(cc => cc.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Notification
-            modelBuilder.Entity<Notification>()
-                .HasOne(n => n.User)
-                .WithMany(u => u.Notifications)
-                .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // OrderDetail

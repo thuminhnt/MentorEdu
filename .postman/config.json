@@ -1,0 +1,14 @@
+{
+  "workspace": {
+    "id": "c59a00f5-5b3c-4b84-852f-c945ba7ab0d3"
+  },
+  "entities": {
+    "collections": [],
+    "environments": [],
+    "specs": [
+      "..\\obj\\Debug\\net8.0\\EndpointInfo\\MentorEdu.json"
+    ],
+    "flows": [],
+    "globals": []
+  }
+}
