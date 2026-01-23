@@ -448,6 +448,13 @@ namespace MentorEdu.DTOs.Admin
         [MaxLength(100)]
         public string FullName { get; set; } = string.Empty;
 
+        // ? Add password field (optional - only update if provided)
+        [MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
+        [MaxLength(100, ErrorMessage = "Password must be less than 100 characters")]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$", 
+            ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, and one number")]
+        public string? Password { get; set; }
+
         [Phone(ErrorMessage = "Invalid phone format")]
         public string? Phone { get; set; }
 
