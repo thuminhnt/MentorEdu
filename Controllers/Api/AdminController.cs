@@ -1,3 +1,4 @@
+using MentorEdu.DTOs.Admin;
 using MentorEdu.DTOs.Category;
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Report;
@@ -272,12 +273,374 @@ namespace MentorEdu.Controllers.Api
 
         #endregion
 
+        #region Requests Management
+
+        /// <summary>
+        /// Get all requests with filters
+        /// </summary>
+        [HttpGet("requests")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminRequestListDto>>>> GetAllRequests([FromQuery] AdminSearchRequestDto request)
+        {
+            var result = await _adminService.GetAllRequestsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminRequestListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminRequestListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Delete a request (admin only)
+        /// </summary>
+        [HttpDelete("requests/{requestId}")]
+        public async Task<ActionResult<ApiResponse>> DeleteRequest(long requestId, [FromQuery] string reason = "Violated policies")
+        {
+            var result = await _adminService.AdminDeleteRequestAsync(requestId, reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Proposals Management
+
+        /// <summary>
+        /// Get all proposals with filters
+        /// </summary>
+        [HttpGet("proposals")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminProposalListDto>>>> GetAllProposals([FromQuery] AdminSearchProposalDto request)
+        {
+            var result = await _adminService.GetAllProposalsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminProposalListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminProposalListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Delete a proposal (admin only)
+        /// </summary>
+        [HttpDelete("proposals/{proposalId}")]
+        public async Task<ActionResult<ApiResponse>> DeleteProposal(long proposalId, [FromQuery] string reason = "Violated policies")
+        {
+            var result = await _adminService.AdminDeleteProposalAsync(proposalId, reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Orders Management
+
+        /// <summary>
+        /// Get all orders with filters
+        /// </summary>
+        [HttpGet("orders")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminOrderListDto>>>> GetAllOrders([FromQuery] AdminSearchOrderDto request)
+        {
+            var result = await _adminService.GetAllOrdersAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminOrderListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminOrderListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get order detail for admin
+        /// </summary>
+        [HttpGet("orders/{orderId}")]
+        public async Task<ActionResult<ApiResponse<AdminOrderListDto>>> GetOrderDetail(long orderId)
+        {
+            var result = await _adminService.GetOrderDetailForAdminAsync(orderId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<AdminOrderListDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<AdminOrderListDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Update order status (admin intervention)
+        /// </summary>
+        [HttpPut("orders/{orderId}/status")]
+        public async Task<ActionResult<ApiResponse>> UpdateOrderStatus(long orderId, [FromBody] AdminUpdateOrderStatusDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.FailResponse("Invalid request data"));
+
+            var adminId = GetCurrentUserId();
+            var result = await _adminService.AdminUpdateOrderStatusAsync(orderId, adminId, request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// Refund an order (admin only)
+        /// </summary>
+        [HttpPost("orders/{orderId}/refund")]
+        public async Task<ActionResult<ApiResponse>> RefundOrder(long orderId, [FromBody] AdminRefundOrderDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.FailResponse("Invalid request data"));
+
+            var adminId = GetCurrentUserId();
+            var result = await _adminService.AdminRefundOrderAsync(orderId, adminId, request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Community Posts Management
+
+        /// <summary>
+        /// Get all community posts with filters
+        /// </summary>
+        [HttpGet("posts")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminPostListDto>>>> GetAllPosts([FromQuery] AdminSearchPostDto request)
+        {
+            var result = await _adminService.GetAllPostsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminPostListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminPostListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Delete a post (admin only)
+        /// </summary>
+        [HttpDelete("posts/{postId}")]
+        public async Task<ActionResult<ApiResponse>> DeletePost(long postId, [FromQuery] string reason = "Violated policies")
+        {
+            var result = await _adminService.AdminDeletePostAsync(postId, reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// Hide a post (admin only)
+        /// </summary>
+        [HttpPost("posts/{postId}/hide")]
+        public async Task<ActionResult<ApiResponse>> HidePost(long postId, [FromBody] HideContentRequest? request = null)
+        {
+            var result = await _adminService.AdminHidePostAsync(postId, request?.Reason ?? "Violated policies");
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Community Comments Management
+
+        /// <summary>
+        /// Get all comments with filters
+        /// </summary>
+        [HttpGet("comments")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminCommentListDto>>>> GetAllComments([FromQuery] AdminSearchCommentDto request)
+        {
+            var result = await _adminService.GetAllCommentsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminCommentListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminCommentListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Delete a comment (admin only)
+        /// </summary>
+        [HttpDelete("comments/{commentId}")]
+        public async Task<ActionResult<ApiResponse>> DeleteComment(long commentId, [FromQuery] string reason = "Violated policies")
+        {
+            var result = await _adminService.AdminDeleteCommentAsync(commentId, reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Transactions Management
+
+        /// <summary>
+        /// Get all transactions with filters
+        /// </summary>
+        [HttpGet("transactions")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminTransactionListDto>>>> GetAllTransactions([FromQuery] AdminSearchTransactionDto request)
+        {
+            var result = await _adminService.GetAllTransactionsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminTransactionListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminTransactionListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Verify a transaction (approve or reject pending transactions)
+        /// </summary>
+        [HttpPost("transactions/{transactionId}/verify")]
+        public async Task<ActionResult<ApiResponse>> VerifyTransaction(long transactionId, [FromBody] VerifyTransactionRequest request)
+        {
+            var adminId = GetCurrentUserId();
+            var result = await _adminService.AdminVerifyTransactionAsync(transactionId, adminId, request.Approve, request.Note);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Wallets Management
+
+        /// <summary>
+        /// Get all wallets with filters
+        /// </summary>
+        [HttpGet("wallets")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminWalletListDto>>>> GetAllWallets([FromQuery] AdminSearchWalletDto request)
+        {
+            var result = await _adminService.GetAllWalletsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminWalletListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminWalletListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get wallet detail for admin
+        /// </summary>
+        [HttpGet("wallets/{walletId}")]
+        public async Task<ActionResult<ApiResponse<AdminWalletListDto>>> GetWalletDetail(long walletId)
+        {
+            var result = await _adminService.GetWalletDetailForAdminAsync(walletId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<AdminWalletListDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<AdminWalletListDto>.SuccessResponse(result.Data!));
+        }
+
+        #endregion
+
+        #region Reviews Management
+
+        /// <summary>
+        /// Get all reviews with filters
+        /// </summary>
+        [HttpGet("reviews")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminReviewListDto>>>> GetAllReviews([FromQuery] AdminSearchReviewDto request)
+        {
+            var result = await _adminService.GetAllReviewsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminReviewListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminReviewListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Delete a review (admin only)
+        /// </summary>
+        [HttpDelete("reviews/{reviewId}")]
+        public async Task<ActionResult<ApiResponse>> DeleteReview(long reviewId, [FromQuery] string reason = "Inappropriate content")
+        {
+            var result = await _adminService.AdminDeleteReviewAsync(reviewId, reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Hashtags Management
+
+        /// <summary>
+        /// Get all hashtags with filters
+        /// </summary>
+        [HttpGet("hashtags")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<AdminHashtagDto>>>> GetAllHashtags([FromQuery] AdminSearchHashtagDto request)
+        {
+            var result = await _adminService.GetAllHashtagsAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<AdminHashtagDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<AdminHashtagDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Create a new hashtag
+        /// </summary>
+        [HttpPost("hashtags")]
+        public async Task<ActionResult<ApiResponse<AdminHashtagDto>>> CreateHashtag([FromBody] CreateHashtagDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse<AdminHashtagDto>.FailResponse("Invalid request data"));
+
+            var result = await _adminService.CreateHashtagAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<AdminHashtagDto>.FailResponse(result.Message ?? ""));
+
+            return StatusCode(201, ApiResponse<AdminHashtagDto>.SuccessResponse(result.Data!, result.Message));
+        }
+
+        /// <summary>
+        /// Delete a hashtag
+        /// </summary>
+        [HttpDelete("hashtags/{hashtagId}")]
+        public async Task<ActionResult<ApiResponse>> DeleteHashtag(long hashtagId)
+        {
+            var result = await _adminService.DeleteHashtagAsync(hashtagId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
+        #region Helper Methods
+
         private long GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             return long.TryParse(userIdClaim, out var userId) ? userId : 0;
         }
+
+        #endregion
     }
+
+    #region Request DTOs
 
     public class BanUserRequest
     {
@@ -289,4 +652,17 @@ namespace MentorEdu.Controllers.Api
         public string Status { get; set; } = string.Empty;
         public bool BanUser { get; set; } = false;
     }
+
+    public class HideContentRequest
+    {
+        public string? Reason { get; set; }
+    }
+
+    public class VerifyTransactionRequest
+    {
+        public bool Approve { get; set; }
+        public string? Note { get; set; }
+    }
+
+    #endregion
 }

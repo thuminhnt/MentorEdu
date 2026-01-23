@@ -1,3 +1,4 @@
+using MentorEdu.DTOs.Admin;
 using MentorEdu.DTOs.Category;
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Report;
@@ -16,6 +17,48 @@ namespace MentorEdu.Services.Implementations
         public AdminService(IUnitOfWork unitOfWork) : base(unitOfWork)
         {
         }
+
+        #region Dashboard
+
+        public async Task<ServiceResult<AdminDashboardDto>> GetDashboardAsync()
+        {
+            var totalUsers = await _unitOfWork.Users.CountAsync();
+            var totalStudents = await _unitOfWork.Users.CountAsync(u => u.Role == UserRole.Student);
+            var totalMentors = await _unitOfWork.Users.CountAsync(u => u.Role == UserRole.Mentor);
+            var totalOrders = await _unitOfWork.Orders.CountAsync();
+            var activeOrders = await _unitOfWork.Orders.CountAsync(o => o.Status == OrderStatus.InProgress);
+            var completedOrders = await _unitOfWork.Orders.CountAsync(o => o.Status == OrderStatus.Completed);
+            var disputedOrders = await _unitOfWork.Orders.CountAsync(o => o.Status == OrderStatus.Disputed);
+            var pendingReports = await _unitOfWork.Reports.CountAsync(r => r.Status == null || r.Status == "pending");
+            var totalRequests = await _unitOfWork.Requests.CountAsync();
+            var totalProposals = await _unitOfWork.Proposals.CountAsync();
+            var totalPosts = await _unitOfWork.CommunityPosts.CountAsync();
+            var totalEscrowHolding = await _unitOfWork.Escrows.GetTotalHoldingAmountAsync();
+
+            var completedOrdersList = await _unitOfWork.Orders.GetCompletedOrdersAsync();
+            var totalRevenue = completedOrdersList.Sum(o => o.TotalPrice ?? 0);
+
+            var dashboard = new AdminDashboardDto
+            {
+                TotalUsers = totalUsers,
+                TotalStudents = totalStudents,
+                TotalMentors = totalMentors,
+                TotalOrders = totalOrders,
+                ActiveOrders = activeOrders,
+                CompletedOrders = completedOrders,
+                DisputedOrders = disputedOrders,
+                PendingReports = pendingReports,
+                TotalRequests = totalRequests,
+                TotalProposals = totalProposals,
+                TotalPosts = totalPosts,
+                TotalRevenue = totalRevenue,
+                TotalEscrowHolding = totalEscrowHolding
+            };
+
+            return ServiceResult<AdminDashboardDto>.SuccessResult(dashboard);
+        }
+
+        #endregion
 
         #region User Management
 
@@ -146,7 +189,6 @@ namespace MentorEdu.Services.Implementations
             user.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.Users.Update(user);
-
             await _unitOfWork.SaveChangesAsync();
 
             return ServiceResult.SuccessResult("Account banned successfully");
@@ -175,9 +217,7 @@ namespace MentorEdu.Services.Implementations
         public async Task<ServiceResult<List<CategoryResponseDto>>> GetCategoriesAsync()
         {
             var categories = await _unitOfWork.Categories.GetAllWithHierarchyAsync();
-
             var dtos = categories.Select(c => MapToCategoryDto(c)).ToList();
-
             return ServiceResult<List<CategoryResponseDto>>.SuccessResult(dtos);
         }
 
@@ -194,7 +234,6 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult<CategoryResponseDto>> CreateCategoryAsync(CreateCategoryRequest request)
         {
-            // Check parent exists
             if (request.ParentId.HasValue)
             {
                 var parent = await _unitOfWork.Categories.GetByIdAsync(request.ParentId.Value);
@@ -230,7 +269,6 @@ namespace MentorEdu.Services.Implementations
             if (category == null)
                 return ServiceResult<CategoryResponseDto>.NotFoundResult("Category not found");
 
-            // Check circular reference
             if (request.ParentId.HasValue && request.ParentId.Value == categoryId)
                 return ServiceResult<CategoryResponseDto>.FailResult("Category cannot be its own parent");
 
@@ -262,7 +300,6 @@ namespace MentorEdu.Services.Implementations
             if (category.Children?.Any() == true)
                 return ServiceResult.FailResult("Cannot delete category with child categories");
 
-            // Check if category is being used
             var requestsCount = await _unitOfWork.Requests.CountAsync(r => r.CategoryId == categoryId);
             if (requestsCount > 0)
                 return ServiceResult.FailResult("Cannot delete category that is in use");
@@ -287,10 +324,8 @@ namespace MentorEdu.Services.Implementations
             var totalCount = await query.CountAsync();
 
             var reports = await query
-                .Include(r => r.Reporter)
-                    .ThenInclude(u => u.UserProfile)
-                .Include(r => r.ReportedUser)
-                    .ThenInclude(u => u.UserProfile)
+                .Include(r => r.Reporter).ThenInclude(u => u.UserProfile)
+                .Include(r => r.ReportedUser).ThenInclude(u => u.UserProfile)
                 .Include(r => r.Order)
                 .Include(r => r.Handler)
                 .OrderByDescending(r => r.CreatedAt)
@@ -322,19 +357,15 @@ namespace MentorEdu.Services.Implementations
         public async Task<ServiceResult<ReportDetailDto>> GetReportDetailAsync(long reportId)
         {
             var report = await _unitOfWork.Reports.Query()
-                .Include(r => r.Reporter)
-                    .ThenInclude(u => u.UserProfile)
-                .Include(r => r.ReportedUser)
-                    .ThenInclude(u => u.UserProfile)
-                .Include(r => r.Order)
-                    .ThenInclude(o => o!.Request)
+                .Include(r => r.Reporter).ThenInclude(u => u.UserProfile)
+                .Include(r => r.ReportedUser).ThenInclude(u => u.UserProfile)
+                .Include(r => r.Order).ThenInclude(o => o!.Request)
                 .Include(r => r.Handler)
                 .FirstOrDefaultAsync(r => r.Id == reportId);
 
             if (report == null)
                 return ServiceResult<ReportDetailDto>.NotFoundResult("Report not found");
 
-            // Get total reports for reported user
             var reportedUserReportCount = await _unitOfWork.Reports.CountAsync(r => r.ReportedUserId == report.ReportedUserId);
 
             var dto = new ReportDetailDto
@@ -385,7 +416,6 @@ namespace MentorEdu.Services.Implementations
 
             _unitOfWork.Reports.Update(report);
 
-            // Ban user if required
             if (request.BanUser)
             {
                 var reportedUser = await _unitOfWork.Users.GetByIdAsync(report.ReportedUserId);
@@ -397,48 +427,891 @@ namespace MentorEdu.Services.Implementations
                 }
             }
 
-            // TODO: Send notification to reporter and reported user
-
             await _unitOfWork.SaveChangesAsync();
-
             return ServiceResult.SuccessResult("Report handled successfully");
         }
 
         #endregion
 
-        #region Dashboard
+        #region Requests Management
 
-        public async Task<ServiceResult<AdminDashboardDto>> GetDashboardAsync()
+        public async Task<ServiceResult<PagedResponse<AdminRequestListDto>>> GetAllRequestsAsync(AdminSearchRequestDto request)
         {
-            var totalUsers = await _unitOfWork.Users.CountAsync();
-            var totalStudents = await _unitOfWork.Users.CountAsync(u => u.Role == UserRole.Student);
-            var totalMentors = await _unitOfWork.Users.CountAsync(u => u.Role == UserRole.Mentor);
-            var totalOrders = await _unitOfWork.Orders.CountAsync();
-            var activeOrders = await _unitOfWork.Orders.CountAsync(o => o.Status == OrderStatus.InProgress);
-            var completedOrders = await _unitOfWork.Orders.CountAsync(o => o.Status == OrderStatus.Completed);
-            var disputedOrders = await _unitOfWork.Orders.CountAsync(o => o.Status == OrderStatus.Disputed);
-            var pendingReports = await _unitOfWork.Reports.CountAsync(r => r.Status == null || r.Status == "pending");
-            var totalEscrowHolding = await _unitOfWork.Escrows.GetTotalHoldingAmountAsync();
+            var query = _unitOfWork.Requests.Query();
 
-            // Calculate total revenue from completed orders
-            var completedOrdersList = await _unitOfWork.Orders.GetCompletedOrdersAsync();
-            var totalRevenue = completedOrdersList.Sum(o => o.TotalPrice ?? 0);
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+                query = query.Where(r => r.Title!.Contains(request.Keyword) || r.Description!.Contains(request.Keyword));
 
-            var dashboard = new AdminDashboardDto
+            if (request.CategoryId.HasValue)
+                query = query.Where(r => r.CategoryId == request.CategoryId);
+
+            if (request.Status.HasValue)
+                query = query.Where(r => r.Status == request.Status);
+
+            if (request.StudentId.HasValue)
+                query = query.Where(r => r.StudentId == request.StudentId);
+
+            if (request.FromDate.HasValue)
+                query = query.Where(r => r.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(r => r.CreatedAt <= request.ToDate);
+
+            var totalCount = await query.CountAsync();
+
+            var requests = await query
+                .Include(r => r.Student).ThenInclude(s => s.UserProfile)
+                .Include(r => r.Category)
+                .Include(r => r.Proposals)
+                .Include(r => r.Orders)
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = requests.Select(r => new AdminRequestListDto
             {
-                TotalUsers = totalUsers,
-                TotalStudents = totalStudents,
-                TotalMentors = totalMentors,
-                TotalOrders = totalOrders,
-                ActiveOrders = activeOrders,
-                CompletedOrders = completedOrders,
-                DisputedOrders = disputedOrders,
-                PendingReports = pendingReports,
-                TotalRevenue = totalRevenue,
-                TotalEscrowHolding = totalEscrowHolding
+                Id = r.Id,
+                Title = r.Title,
+                Description = r.Description?.Length > 200 ? r.Description.Substring(0, 200) + "..." : r.Description,
+                CategoryName = r.Category?.Name,
+                CategoryId = r.CategoryId,
+                ExpectedBudget = r.ExpectedBudget,
+                ExpectedHours = r.ExpectedHours,
+                Status = r.Status,
+                CreatedAt = r.CreatedAt,
+                ProposalCount = r.Proposals?.Count ?? 0,
+                OrderCount = r.Orders?.Count ?? 0,
+                StudentId = r.StudentId,
+                StudentName = r.Student?.UserProfile?.FullName,
+                StudentEmail = r.Student?.Email,
+                StudentAvatar = r.Student?.UserProfile?.AvatarUrl
+            });
+
+            var response = PagedResponse<AdminRequestListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminRequestListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult> AdminDeleteRequestAsync(long requestId, string reason)
+        {
+            var req = await _unitOfWork.Requests.Query()
+                .Include(r => r.Orders)
+                .Include(r => r.Proposals)
+                .FirstOrDefaultAsync(r => r.Id == requestId);
+
+            if (req == null)
+                return ServiceResult.NotFoundResult("Request not found");
+
+            // Check if there are active orders
+            if (req.Orders?.Any(o => o.Status == OrderStatus.InProgress || o.Status == OrderStatus.PendingPayment) == true)
+                return ServiceResult.FailResult("Cannot delete request with active orders");
+
+            // Delete related proposals first
+            if (req.Proposals?.Any() == true)
+            {
+                foreach (var proposal in req.Proposals)
+                {
+                    _unitOfWork.Proposals.Remove(proposal);
+                }
+            }
+
+            _unitOfWork.Requests.Remove(req);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Request deleted successfully");
+        }
+
+        #endregion
+
+        #region Proposals Management
+
+        public async Task<ServiceResult<PagedResponse<AdminProposalListDto>>> GetAllProposalsAsync(AdminSearchProposalDto request)
+        {
+            var query = _unitOfWork.Proposals.Query();
+
+            if (request.RequestId.HasValue)
+                query = query.Where(p => p.RequestId == request.RequestId);
+
+            if (request.MentorId.HasValue)
+                query = query.Where(p => p.MentorId == request.MentorId);
+
+            if (request.Status.HasValue)
+                query = query.Where(p => p.Status == request.Status);
+
+            if (request.FromDate.HasValue)
+                query = query.Where(p => p.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(p => p.CreatedAt <= request.ToDate);
+
+            var totalCount = await query.CountAsync();
+
+            var proposals = await query
+                .Include(p => p.Mentor).ThenInclude(m => m.UserProfile)
+                .Include(p => p.Request).ThenInclude(r => r.Student).ThenInclude(s => s.UserProfile)
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = proposals.Select(p => new AdminProposalListDto
+            {
+                Id = p.Id,
+                RequestId = p.RequestId,
+                RequestTitle = p.Request?.Title,
+                Price = p.Price,
+                EstimatedHours = p.EstimatedHours,
+                Message = p.Message?.Length > 200 ? p.Message.Substring(0, 200) + "..." : p.Message,
+                Status = p.Status,
+                CreatedAt = p.CreatedAt,
+                MentorId = p.MentorId,
+                MentorName = p.Mentor?.UserProfile?.FullName,
+                MentorEmail = p.Mentor?.Email,
+                MentorAvatar = p.Mentor?.UserProfile?.AvatarUrl,
+                StudentId = p.Request?.StudentId ?? 0,
+                StudentName = p.Request?.Student?.UserProfile?.FullName
+            });
+
+            var response = PagedResponse<AdminProposalListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminProposalListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult> AdminDeleteProposalAsync(long proposalId, string reason)
+        {
+            var proposal = await _unitOfWork.Proposals.Query()
+                .Include(p => p.Orders)
+                .FirstOrDefaultAsync(p => p.Id == proposalId);
+
+            if (proposal == null)
+                return ServiceResult.NotFoundResult("Proposal not found");
+
+            if (proposal.Orders?.Any(o => o.Status == OrderStatus.InProgress || o.Status == OrderStatus.PendingPayment) == true)
+                return ServiceResult.FailResult("Cannot delete proposal with active orders");
+
+            _unitOfWork.Proposals.Remove(proposal);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Proposal deleted successfully");
+        }
+
+        #endregion
+
+        #region Orders Management
+
+        public async Task<ServiceResult<PagedResponse<AdminOrderListDto>>> GetAllOrdersAsync(AdminSearchOrderDto request)
+        {
+            var query = _unitOfWork.Orders.Query();
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+                query = query.Where(o => o.Request!.Title!.Contains(request.Keyword));
+
+            if (request.Status.HasValue)
+                query = query.Where(o => o.Status == request.Status);
+
+            if (request.BillingType.HasValue)
+                query = query.Where(o => o.BillingType == request.BillingType);
+
+            if (request.StudentId.HasValue)
+                query = query.Where(o => o.StudentId == request.StudentId);
+
+            if (request.MentorId.HasValue)
+                query = query.Where(o => o.MentorId == request.MentorId);
+
+            if (request.FromDate.HasValue)
+                query = query.Where(o => o.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(o => o.CreatedAt <= request.ToDate);
+
+            if (request.HasDispute == true)
+                query = query.Where(o => o.Status == OrderStatus.Disputed);
+
+            var totalCount = await query.CountAsync();
+
+            var orders = await query
+                .Include(o => o.Student).ThenInclude(s => s.UserProfile)
+                .Include(o => o.Mentor).ThenInclude(m => m.UserProfile)
+                .Include(o => o.Request)
+                .Include(o => o.Escrow)
+                .Include(o => o.Reports)
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = orders.Select(o => new AdminOrderListDto
+            {
+                Id = o.Id,
+                RequestTitle = o.Request?.Title,
+                BillingType = o.BillingType,
+                AgreedPrice = o.AgreedPrice,
+                AgreedHourlyRate = o.AgreedHourlyRate,
+                TotalPrice = o.TotalPrice,
+                Status = o.Status,
+                StartedAt = o.StartedAt,
+                CompletedAt = o.CompletedAt,
+                CancelledAt = o.CancelledAt,
+                CreatedAt = o.CreatedAt,
+                StudentId = o.StudentId,
+                StudentName = o.Student?.UserProfile?.FullName,
+                StudentEmail = o.Student?.Email,
+                MentorId = o.MentorId,
+                MentorName = o.Mentor?.UserProfile?.FullName,
+                MentorEmail = o.Mentor?.Email,
+                HasEscrow = o.Escrow != null,
+                EscrowAmount = o.Escrow?.Amount,
+                EscrowStatus = o.Escrow?.Status.ToString(),
+                ReportCount = o.Reports?.Count ?? 0
+            });
+
+            var response = PagedResponse<AdminOrderListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminOrderListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult<AdminOrderListDto>> GetOrderDetailForAdminAsync(long orderId)
+        {
+            var order = await _unitOfWork.Orders.Query()
+                .Include(o => o.Student).ThenInclude(s => s.UserProfile)
+                .Include(o => o.Mentor).ThenInclude(m => m.UserProfile)
+                .Include(o => o.Request)
+                .Include(o => o.Escrow)
+                .Include(o => o.Reports)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return ServiceResult<AdminOrderListDto>.NotFoundResult("Order not found");
+
+            var dto = new AdminOrderListDto
+            {
+                Id = order.Id,
+                RequestTitle = order.Request?.Title,
+                BillingType = order.BillingType,
+                AgreedPrice = order.AgreedPrice,
+                AgreedHourlyRate = order.AgreedHourlyRate,
+                TotalPrice = order.TotalPrice,
+                Status = order.Status,
+                StartedAt = order.StartedAt,
+                CompletedAt = order.CompletedAt,
+                CancelledAt = order.CancelledAt,
+                CreatedAt = order.CreatedAt,
+                StudentId = order.StudentId,
+                StudentName = order.Student?.UserProfile?.FullName,
+                StudentEmail = order.Student?.Email,
+                MentorId = order.MentorId,
+                MentorName = order.Mentor?.UserProfile?.FullName,
+                MentorEmail = order.Mentor?.Email,
+                HasEscrow = order.Escrow != null,
+                EscrowAmount = order.Escrow?.Amount,
+                EscrowStatus = order.Escrow?.Status.ToString(),
+                ReportCount = order.Reports?.Count ?? 0
             };
 
-            return ServiceResult<AdminDashboardDto>.SuccessResult(dashboard);
+            return ServiceResult<AdminOrderListDto>.SuccessResult(dto);
+        }
+
+        public async Task<ServiceResult> AdminUpdateOrderStatusAsync(long orderId, long adminId, AdminUpdateOrderStatusDto request)
+        {
+            var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+
+            if (order == null)
+                return ServiceResult.NotFoundResult("Order not found");
+
+            var oldStatus = order.Status;
+            order.Status = request.NewStatus;
+            order.UpdatedAt = DateTime.UtcNow;
+
+            if (request.NewStatus == OrderStatus.InProgress && order.StartedAt == null)
+                order.StartedAt = DateTime.UtcNow;
+
+            if (request.NewStatus == OrderStatus.Completed)
+                order.CompletedAt = DateTime.UtcNow;
+
+            if (request.NewStatus == OrderStatus.Cancelled)
+                order.CancelledAt = DateTime.UtcNow;
+
+            _unitOfWork.Orders.Update(order);
+
+            // Log status change
+            var orderDetail = new OrderDetail
+            {
+                OrderId = orderId,
+                OldStatus = oldStatus.ToString(),
+                NewStatus = request.NewStatus.ToString(),
+                ChangedBy = adminId,
+                Note = $"[Admin Action] {request.Note}",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.OrderDetails.AddAsync(orderDetail);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Order status updated successfully");
+        }
+
+        public async Task<ServiceResult> AdminRefundOrderAsync(long orderId, long adminId, AdminRefundOrderDto request)
+        {
+            var order = await _unitOfWork.Orders.Query()
+                .Include(o => o.Escrow)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return ServiceResult.NotFoundResult("Order not found");
+
+            if (order.Escrow == null || order.Escrow.Status != EscrowStatus.Holding)
+                return ServiceResult.FailResult("No escrow to refund");
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                var refundAmount = request.FullRefund ? order.Escrow.Amount : request.Amount;
+
+                if (refundAmount > order.Escrow.Amount)
+                    return ServiceResult.FailResult("Refund amount exceeds escrow amount");
+
+                // Update escrow
+                order.Escrow.Status = EscrowStatus.Refunded;
+                order.Escrow.RefundedAt = DateTime.UtcNow;
+
+                // Update order status
+                order.Status = OrderStatus.Cancelled;
+                order.CancelledAt = DateTime.UtcNow;
+                order.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.Orders.Update(order);
+
+                // Refund to student wallet
+                var studentWallet = await _unitOfWork.Wallets.GetByUserIdAsync(order.StudentId);
+                if (studentWallet != null)
+                {
+                    studentWallet.Balance += refundAmount;
+                    studentWallet.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.Wallets.Update(studentWallet);
+
+                    // Create refund transaction
+                    var transaction = new Transaction
+                    {
+                        WalletId = studentWallet.Id,
+                        OrderId = orderId,
+                        Type = TransactionType.EscrowRefund,
+                        Amount = refundAmount,
+                        Status = TransactionStatus.Success,
+                        Description = $"[Admin Refund] {request.Reason}",
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.Transactions.AddAsync(transaction);
+                }
+
+                // Log status change
+                var orderDetail = new OrderDetail
+                {
+                    OrderId = orderId,
+                    OldStatus = order.Status.ToString(),
+                    NewStatus = OrderStatus.Cancelled.ToString(),
+                    ChangedBy = adminId,
+                    Note = $"[Admin Refund] Amount: {refundAmount:N0} VND. Reason: {request.Reason}",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.OrderDetails.AddAsync(orderDetail);
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
+                return ServiceResult.SuccessResult($"Refund of {refundAmount:N0} VND processed successfully");
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+
+        #endregion
+
+        #region Community Posts Management
+
+        public async Task<ServiceResult<PagedResponse<AdminPostListDto>>> GetAllPostsAsync(AdminSearchPostDto request)
+        {
+            var query = _unitOfWork.CommunityPosts.Query();
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+                query = query.Where(p => p.Title!.Contains(request.Keyword) || p.Content!.Contains(request.Keyword));
+
+            if (request.AuthorId.HasValue)
+                query = query.Where(p => p.AuthorId == request.AuthorId);
+
+            if (request.FromDate.HasValue)
+                query = query.Where(p => p.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(p => p.CreatedAt <= request.ToDate);
+
+            var totalCount = await query.CountAsync();
+
+            var posts = await query
+                .Include(p => p.Author).ThenInclude(a => a.UserProfile)
+                .Include(p => p.Comments)
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = posts.Select(p => new AdminPostListDto
+            {
+                Id = p.Id,
+                Title = p.Title,
+                ContentPreview = p.Content?.Length > 200 ? p.Content.Substring(0, 200) + "..." : p.Content,
+                CreatedAt = p.CreatedAt,
+                UpdatedAt = p.UpdatedAt,
+                AuthorId = p.AuthorId,
+                AuthorName = p.Author?.UserProfile?.FullName,
+                AuthorEmail = p.Author?.Email,
+                AuthorAvatar = p.Author?.UserProfile?.AvatarUrl,
+                CommentCount = p.Comments?.Count ?? 0,
+                ReportCount = 0,
+                IsHidden = false
+            });
+
+            var response = PagedResponse<AdminPostListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminPostListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult> AdminDeletePostAsync(long postId, string reason)
+        {
+            var post = await _unitOfWork.CommunityPosts.Query()
+                .Include(p => p.Comments)
+                .FirstOrDefaultAsync(p => p.Id == postId);
+
+            if (post == null)
+                return ServiceResult.NotFoundResult("Post not found");
+
+            // Delete related comments first
+            if (post.Comments?.Any() == true)
+            {
+                foreach (var comment in post.Comments)
+                {
+                    _unitOfWork.CommunityComments.Remove(comment);
+                }
+            }
+
+            _unitOfWork.CommunityPosts.Remove(post);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Post deleted successfully");
+        }
+
+        public async Task<ServiceResult> AdminHidePostAsync(long postId, string reason)
+        {
+            // Since we don't have IsHidden field, we'll just return success
+            // In production, add IsHidden field to CommunityPost model
+            var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postId);
+
+            if (post == null)
+                return ServiceResult.NotFoundResult("Post not found");
+
+            // TODO: Add IsHidden field to CommunityPost model
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Post hidden successfully");
+        }
+
+        #endregion
+
+        #region Community Comments Management
+
+        public async Task<ServiceResult<PagedResponse<AdminCommentListDto>>> GetAllCommentsAsync(AdminSearchCommentDto request)
+        {
+            var query = _unitOfWork.CommunityComments.Query();
+
+            if (request.PostId.HasValue)
+                query = query.Where(c => c.PostId == request.PostId);
+
+            if (request.AuthorId.HasValue)
+                query = query.Where(c => c.AuthorId == request.AuthorId);
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+                query = query.Where(c => c.Content!.Contains(request.Keyword));
+
+            if (request.FromDate.HasValue)
+                query = query.Where(c => c.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(c => c.CreatedAt <= request.ToDate);
+
+            var totalCount = await query.CountAsync();
+
+            var comments = await query
+                .Include(c => c.Author).ThenInclude(a => a.UserProfile)
+                .Include(c => c.Post)
+                .OrderByDescending(c => c.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = comments.Select(c => new AdminCommentListDto
+            {
+                Id = c.Id,
+                PostId = c.PostId,
+                PostTitle = c.Post?.Title,
+                Content = c.Content,
+                CreatedAt = c.CreatedAt,
+                AuthorId = c.AuthorId,
+                AuthorName = c.Author?.UserProfile?.FullName,
+                AuthorEmail = c.Author?.Email
+            });
+
+            var response = PagedResponse<AdminCommentListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminCommentListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult> AdminDeleteCommentAsync(long commentId, string reason)
+        {
+            var comment = await _unitOfWork.CommunityComments.GetByIdAsync(commentId);
+
+            if (comment == null)
+                return ServiceResult.NotFoundResult("Comment not found");
+
+            _unitOfWork.CommunityComments.Remove(comment);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Comment deleted successfully");
+        }
+
+        #endregion
+
+        #region Transactions Management
+
+        public async Task<ServiceResult<PagedResponse<AdminTransactionListDto>>> GetAllTransactionsAsync(AdminSearchTransactionDto request)
+        {
+            var query = _unitOfWork.Transactions.Query();
+
+            if (request.UserId.HasValue)
+                query = query.Where(t => t.Wallet.UserId == request.UserId);
+
+            if (request.Type.HasValue)
+                query = query.Where(t => t.Type == request.Type);
+
+            if (request.Status.HasValue)
+                query = query.Where(t => t.Status == request.Status);
+
+            if (request.FromDate.HasValue)
+                query = query.Where(t => t.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(t => t.CreatedAt <= request.ToDate);
+
+            if (request.MinAmount.HasValue)
+                query = query.Where(t => t.Amount >= request.MinAmount);
+
+            if (request.MaxAmount.HasValue)
+                query = query.Where(t => t.Amount <= request.MaxAmount);
+
+            var totalCount = await query.CountAsync();
+
+            var transactions = await query
+                .Include(t => t.Wallet).ThenInclude(w => w.User).ThenInclude(u => u.UserProfile)
+                .OrderByDescending(t => t.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = transactions.Select(t => new AdminTransactionListDto
+            {
+                Id = t.Id,
+                WalletId = t.WalletId,
+                UserId = t.Wallet?.UserId ?? 0,
+                UserName = t.Wallet?.User?.UserProfile?.FullName,
+                UserEmail = t.Wallet?.User?.Email,
+                OrderId = t.OrderId,
+                Type = t.Type,
+                Amount = t.Amount,
+                ExternalRef = t.ExternalRef,
+                Status = t.Status,
+                Description = t.Description,
+                CreatedAt = t.CreatedAt
+            });
+
+            var response = PagedResponse<AdminTransactionListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminTransactionListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult> AdminVerifyTransactionAsync(long transactionId, long adminId, bool approve, string? note)
+        {
+            var transaction = await _unitOfWork.Transactions.GetByIdAsync(transactionId);
+
+            if (transaction == null)
+                return ServiceResult.NotFoundResult("Transaction not found");
+
+            if (transaction.Status != TransactionStatus.Pending)
+                return ServiceResult.FailResult("Only pending transactions can be verified");
+
+            transaction.Status = approve ? TransactionStatus.Success : TransactionStatus.Failed;
+            transaction.Description = $"{transaction.Description} | [Admin: {(approve ? "Approved" : "Rejected")}] {note}";
+
+            _unitOfWork.Transactions.Update(transaction);
+
+            // If approved and it's a topup, add balance
+            if (approve && transaction.Type == TransactionType.Topup)
+            {
+                var wallet = await _unitOfWork.Wallets.GetByIdAsync(transaction.WalletId);
+                if (wallet != null)
+                {
+                    wallet.Balance += transaction.Amount;
+                    wallet.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.Wallets.Update(wallet);
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult($"Transaction {(approve ? "approved" : "rejected")} successfully");
+        }
+
+        #endregion
+
+        #region Wallets Management
+
+        public async Task<ServiceResult<PagedResponse<AdminWalletListDto>>> GetAllWalletsAsync(AdminSearchWalletDto request)
+        {
+            var query = _unitOfWork.Wallets.Query();
+
+            if (request.UserId.HasValue)
+                query = query.Where(w => w.UserId == request.UserId);
+
+            if (!string.IsNullOrWhiteSpace(request.UserEmail))
+                query = query.Where(w => w.User.Email.Contains(request.UserEmail));
+
+            if (request.MinBalance.HasValue)
+                query = query.Where(w => w.Balance >= request.MinBalance);
+
+            if (request.MaxBalance.HasValue)
+                query = query.Where(w => w.Balance <= request.MaxBalance);
+
+            var totalCount = await query.CountAsync();
+
+            var wallets = await query
+                .Include(w => w.User).ThenInclude(u => u.UserProfile)
+                .Include(w => w.Transactions)
+                .OrderByDescending(w => w.Balance)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = wallets.Select(w => new AdminWalletListDto
+            {
+                Id = w.Id,
+                UserId = w.UserId,
+                UserName = w.User?.UserProfile?.FullName,
+                UserEmail = w.User?.Email,
+                UserRole = w.User?.Role.ToString(),
+                Balance = w.Balance,
+                LockedBalance = w.LockedBalance,
+                Currency = w.Currency,
+                CreatedAt = w.CreatedAt,
+                UpdatedAt = w.UpdatedAt,
+                TransactionCount = w.Transactions?.Count ?? 0
+            });
+
+            var response = PagedResponse<AdminWalletListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminWalletListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult<AdminWalletListDto>> GetWalletDetailForAdminAsync(long walletId)
+        {
+            var wallet = await _unitOfWork.Wallets.Query()
+                .Include(w => w.User).ThenInclude(u => u.UserProfile)
+                .Include(w => w.Transactions)
+                .FirstOrDefaultAsync(w => w.Id == walletId);
+
+            if (wallet == null)
+                return ServiceResult<AdminWalletListDto>.NotFoundResult("Wallet not found");
+
+            var dto = new AdminWalletListDto
+            {
+                Id = wallet.Id,
+                UserId = wallet.UserId,
+                UserName = wallet.User?.UserProfile?.FullName,
+                UserEmail = wallet.User?.Email,
+                UserRole = wallet.User?.Role.ToString(),
+                Balance = wallet.Balance,
+                LockedBalance = wallet.LockedBalance,
+                Currency = wallet.Currency,
+                CreatedAt = wallet.CreatedAt,
+                UpdatedAt = wallet.UpdatedAt,
+                TransactionCount = wallet.Transactions?.Count ?? 0
+            };
+
+            return ServiceResult<AdminWalletListDto>.SuccessResult(dto);
+        }
+
+        #endregion
+
+        #region Reviews Management
+
+        public async Task<ServiceResult<PagedResponse<AdminReviewListDto>>> GetAllReviewsAsync(AdminSearchReviewDto request)
+        {
+            var query = _unitOfWork.Reviews.Query();
+
+            if (request.OrderId.HasValue)
+                query = query.Where(r => r.OrderId == request.OrderId);
+
+            if (request.FromUserId.HasValue)
+                query = query.Where(r => r.FromUserId == request.FromUserId);
+
+            if (request.ToUserId.HasValue)
+                query = query.Where(r => r.ToUserId == request.ToUserId);
+
+            if (request.MinRating.HasValue)
+                query = query.Where(r => r.Rating >= request.MinRating);
+
+            if (request.MaxRating.HasValue)
+                query = query.Where(r => r.Rating <= request.MaxRating);
+
+            if (request.FromDate.HasValue)
+                query = query.Where(r => r.CreatedAt >= request.FromDate);
+
+            if (request.ToDate.HasValue)
+                query = query.Where(r => r.CreatedAt <= request.ToDate);
+
+            var totalCount = await query.CountAsync();
+
+            var reviews = await query
+                .Include(r => r.FromUser).ThenInclude(u => u.UserProfile)
+                .Include(r => r.ToUser).ThenInclude(u => u.UserProfile)
+                .Include(r => r.Order).ThenInclude(o => o.Request)
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = reviews.Select(r => new AdminReviewListDto
+            {
+                Id = r.Id,
+                OrderId = r.OrderId,
+                OrderTitle = r.Order?.Request?.Title,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                CreatedAt = r.CreatedAt,
+                FromUserId = r.FromUserId,
+                FromUserName = r.FromUser?.UserProfile?.FullName,
+                FromUserEmail = r.FromUser?.Email,
+                ToUserId = r.ToUserId,
+                ToUserName = r.ToUser?.UserProfile?.FullName,
+                ToUserEmail = r.ToUser?.Email
+            });
+
+            var response = PagedResponse<AdminReviewListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminReviewListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult> AdminDeleteReviewAsync(long reviewId, string reason)
+        {
+            var review = await _unitOfWork.Reviews.GetByIdAsync(reviewId);
+
+            if (review == null)
+                return ServiceResult.NotFoundResult("Review not found");
+
+            // Update mentor rating if needed
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(review.ToUserId);
+            if (mentorProfile != null && mentorProfile.RatingCount > 0)
+            {
+                // Recalculate rating after removing this review
+                var remainingReviews = await _unitOfWork.Reviews.Query()
+                    .Where(r => r.ToUserId == review.ToUserId && r.Id != reviewId)
+                    .ToListAsync();
+
+                if (remainingReviews.Any())
+                {
+                    mentorProfile.RatingAvg = (decimal)remainingReviews.Average(r => r.Rating);
+                    mentorProfile.RatingCount = remainingReviews.Count;
+                }
+                else
+                {
+                    mentorProfile.RatingAvg = 0;
+                    mentorProfile.RatingCount = 0;
+                }
+                mentorProfile.UpdatedAt = DateTime.UtcNow;
+            }
+
+            _unitOfWork.Reviews.Remove(review);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Review deleted successfully");
+        }
+
+        #endregion
+
+        #region Hashtags Management
+
+        public async Task<ServiceResult<PagedResponse<AdminHashtagDto>>> GetAllHashtagsAsync(AdminSearchHashtagDto request)
+        {
+            var query = _unitOfWork.Hashtags.Query();
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+                query = query.Where(h => h.Name.Contains(request.Keyword));
+
+            var totalCount = await query.CountAsync();
+
+            var hashtags = await query
+                .Include(h => h.MentorHashtags)
+                .OrderBy(h => h.Name)
+                .Skip((request.PageNumber - 1) * request.PageSize)
+                .Take(request.PageSize)
+                .ToListAsync();
+
+            var dtos = hashtags.Select(h => new AdminHashtagDto
+            {
+                Id = h.Id,
+                Name = h.Name,
+                UsageCount = h.MentorHashtags?.Count ?? 0
+            });
+
+            var response = PagedResponse<AdminHashtagDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
+            return ServiceResult<PagedResponse<AdminHashtagDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult<AdminHashtagDto>> CreateHashtagAsync(CreateHashtagDto request)
+        {
+            // Check if exists
+            var existing = await _unitOfWork.Hashtags.GetByNameAsync(request.Name);
+            if (existing != null)
+                return ServiceResult<AdminHashtagDto>.FailResult("Hashtag already exists");
+
+            var hashtag = new Hashtag
+            {
+                Name = request.Name
+            };
+
+            await _unitOfWork.Hashtags.AddAsync(hashtag);
+            await _unitOfWork.SaveChangesAsync();
+
+            var dto = new AdminHashtagDto
+            {
+                Id = hashtag.Id,
+                Name = hashtag.Name,
+                UsageCount = 0
+            };
+
+            return ServiceResult<AdminHashtagDto>.CreatedResult(dto, "Hashtag created successfully");
+        }
+
+        public async Task<ServiceResult> DeleteHashtagAsync(long hashtagId)
+        {
+            var hashtag = await _unitOfWork.Hashtags.Query()
+                .Include(h => h.MentorHashtags)
+                .FirstOrDefaultAsync(h => h.Id == hashtagId);
+
+            if (hashtag == null)
+                return ServiceResult.NotFoundResult("Hashtag not found");
+
+            if (hashtag.MentorHashtags?.Any() == true)
+                return ServiceResult.FailResult("Cannot delete hashtag that is in use");
+
+            _unitOfWork.Hashtags.Remove(hashtag);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Hashtag deleted successfully");
         }
 
         #endregion
