@@ -62,7 +62,7 @@ namespace MentorEdu.Services.Implementations
 
         #region User Management
 
-        public async Task<ServiceResult<PagedResponse<UserBasicDto>>> GetUsersAsync(int pageNumber, int pageSize, UserRole? role = null, bool? isActive = null)
+        public async Task<ServiceResult<PagedResponse<UserBasicDto>>> GetUsersAsync(int pageNumber, int pageSize, UserRole? role = null, bool? isActive = null, string? keyword = null)
         {
             var query = _unitOfWork.Users.Query();
 
@@ -71,6 +71,9 @@ namespace MentorEdu.Services.Implementations
 
             if (isActive.HasValue)
                 query = query.Where(u => u.IsActive == isActive.Value);
+
+            if (!string.IsNullOrWhiteSpace(keyword))
+                query = query.Where(u => u.Email.Contains(keyword) || u.UserProfile.FullName.Contains(keyword));
 
             var totalCount = await query.CountAsync();
 
@@ -138,6 +141,234 @@ namespace MentorEdu.Services.Implementations
             }
 
             return ServiceResult<UserDetailDto>.SuccessResult(dto);
+        }
+
+        public async Task<ServiceResult<UserDetailDto>> AdminCreateUserAsync(AdminCreateUserDto request)
+        {
+            // Check email exists
+            var existingUser = await _unitOfWork.Users.GetByEmailAsync(request.Email);
+            if (existingUser != null)
+                return ServiceResult<UserDetailDto>.FailResult("Email already exists");
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                // Create user
+                var user = new User
+                {
+                    Email = request.Email,
+                    PasswordHash = HashPassword(request.Password),
+                    Role = request.Role,
+                    IsVerified = request.IsVerified,
+                    IsActive = request.IsActive,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.Users.AddAsync(user);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Create user profile
+                var userProfile = new UserProfile
+                {
+                    UserId = user.Id,
+                    FullName = request.FullName,
+                    Phone = request.Phone,
+                    Gender = request.Gender,
+                    School = request.School,
+                    Major = request.Major,
+                    Bio = request.Bio,
+                    City = request.City,
+                    Country = request.Country
+                };
+
+                await _unitOfWork.UserProfiles.AddAsync(userProfile);
+
+                // Create wallet
+                var wallet = new Wallet
+                {
+                    UserId = user.Id,
+                    Balance = 0,
+                    LockedBalance = 0,
+                    Currency = "VND",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.Wallets.AddAsync(wallet);
+
+                // If mentor, create mentor profile
+                if (request.Role == UserRole.Mentor)
+                {
+                    var mentorProfile = new MentorProfile
+                    {
+                        UserId = user.Id,
+                        Title = "New Mentor",
+                        HourlyRate = 0,
+                        PackagePrice = 0,
+                        ExperienceYears = 0,
+                        Introduction = "",
+                        AvailabilityNote = "",
+                        RatingAvg = 0,
+                        RatingCount = 0,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.MentorProfiles.AddAsync(mentorProfile);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
+                // Return created user detail
+                var dto = new UserDetailDto
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    Role = user.Role,
+                    IsVerified = user.IsVerified,
+                    IsActive = user.IsActive,
+                    CreatedAt = user.CreatedAt,
+                    FullName = userProfile.FullName,
+                    Phone = userProfile.Phone,
+                    Gender = userProfile.Gender,
+                    School = userProfile.School,
+                    Major = userProfile.Major,
+                    Bio = userProfile.Bio,
+                    City = userProfile.City,
+                    Country = userProfile.Country
+                };
+
+                return ServiceResult<UserDetailDto>.CreatedResult(dto, "User created successfully");
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+
+        public async Task<ServiceResult<UserDetailDto>> AdminUpdateUserAsync(long userId, AdminUpdateUserDto request)
+        {
+            var user = await _unitOfWork.Users.Query()
+                .Include(u => u.UserProfile)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return ServiceResult<UserDetailDto>.NotFoundResult("User not found");
+
+            if (user.Role == UserRole.Admin)
+                return ServiceResult<UserDetailDto>.FailResult("Cannot update admin account");
+
+            // Check email unique (if changed)
+            if (user.Email != request.Email)
+            {
+                var existingUser = await _unitOfWork.Users.GetByEmailAsync(request.Email);
+                if (existingUser != null && existingUser.Id != userId)
+                    return ServiceResult<UserDetailDto>.FailResult("Email already exists");
+            }
+
+            // Update user
+            user.Email = request.Email;
+            user.IsVerified = request.IsVerified;
+            user.IsActive = request.IsActive;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.Users.Update(user);
+
+            // Update user profile
+            if (user.UserProfile != null)
+            {
+                user.UserProfile.FullName = request.FullName;
+                user.UserProfile.Phone = request.Phone;
+                user.UserProfile.Gender = request.Gender;
+                user.UserProfile.School = request.School;
+                user.UserProfile.Major = request.Major;
+                user.UserProfile.Bio = request.Bio;
+                user.UserProfile.City = request.City;
+                user.UserProfile.Country = request.Country;
+
+                _unitOfWork.UserProfiles.Update(user.UserProfile);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // Return updated user detail
+            var dto = new UserDetailDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Role = user.Role,
+                IsVerified = user.IsVerified,
+                IsActive = user.IsActive,
+                CreatedAt = user.CreatedAt,
+                FullName = user.UserProfile?.FullName,
+                Phone = user.UserProfile?.Phone,
+                Gender = user.UserProfile?.Gender,
+                School = user.UserProfile?.School,
+                Major = user.UserProfile?.Major,
+                Bio = user.UserProfile?.Bio,
+                City = user.UserProfile?.City,
+                Country = user.UserProfile?.Country
+            };
+
+            return ServiceResult<UserDetailDto>.SuccessResult(dto, "User updated successfully");
+        }
+
+        public async Task<ServiceResult> AdminDeleteUserAsync(long userId)
+        {
+            var user = await _unitOfWork.Users.Query()
+                .Include(u => u.UserProfile)
+                .Include(u => u.MentorProfile)
+                .Include(u => u.Wallet)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            if (user.Role == UserRole.Admin)
+                return ServiceResult.FailResult("Cannot delete admin account");
+
+            // Check if user has active orders
+            var hasActiveOrders = await _unitOfWork.Orders.Query()
+                .AnyAsync(o => (o.StudentId == userId || o.MentorId == userId) && 
+                               (o.Status == OrderStatus.InProgress || o.Status == OrderStatus.PendingPayment));
+
+            if (hasActiveOrders)
+                return ServiceResult.FailResult("Cannot delete user with active orders");
+
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                // Delete related data (cascade)
+                if (user.UserProfile != null)
+                    _unitOfWork.UserProfiles.Remove(user.UserProfile);
+
+                if (user.MentorProfile != null)
+                    _unitOfWork.MentorProfiles.Remove(user.MentorProfile);
+
+                if (user.Wallet != null)
+                {
+                    // Check wallet balance
+                    if (user.Wallet.Balance > 0)
+                        return ServiceResult.FailResult("Cannot delete user with positive wallet balance");
+
+                    _unitOfWork.Wallets.Remove(user.Wallet);
+                }
+
+                // Delete user
+                _unitOfWork.Users.Remove(user);
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
+                return ServiceResult.SuccessResult("User deleted successfully");
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
         }
 
         public async Task<ServiceResult> ActivateUserAsync(long userId)
@@ -1329,6 +1560,11 @@ namespace MentorEdu.Services.Implementations
                 ParentName = category.Parent?.Name,
                 Children = category.Children?.Select(c => MapToCategoryDto(c)).ToList()
             };
+        }
+
+        private static string HashPassword(string password)
+        {
+            return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
         #endregion

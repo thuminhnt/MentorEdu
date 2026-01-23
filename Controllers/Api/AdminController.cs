@@ -51,9 +51,10 @@ namespace MentorEdu.Controllers.Api
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10,
             [FromQuery] UserRole? role = null,
-            [FromQuery] bool? isActive = null)
+            [FromQuery] bool? isActive = null,
+            [FromQuery] string? keyword = null)
         {
-            var result = await _adminService.GetUsersAsync(pageNumber, pageSize, role, isActive);
+            var result = await _adminService.GetUsersAsync(pageNumber, pageSize, role, isActive, keyword);
 
             if (!result.Success)
                 return StatusCode(result.StatusCode, ApiResponse<PagedResponse<UserBasicDto>>.FailResponse(result.Message ?? ""));
@@ -73,6 +74,54 @@ namespace MentorEdu.Controllers.Api
                 return StatusCode(result.StatusCode, ApiResponse<UserDetailDto>.FailResponse(result.Message ?? ""));
 
             return Ok(ApiResponse<UserDetailDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Create new user (admin only)
+        /// </summary>
+        [HttpPost("users")]
+        public async Task<ActionResult<ApiResponse<UserDetailDto>>> CreateUser([FromBody] AdminCreateUserDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse<UserDetailDto>.FailResponse("Invalid request data"));
+
+            var result = await _adminService.AdminCreateUserAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<UserDetailDto>.FailResponse(result.Message ?? ""));
+
+            return StatusCode(201, ApiResponse<UserDetailDto>.SuccessResponse(result.Data!, result.Message));
+        }
+
+        /// <summary>
+        /// Update user (admin only)
+        /// </summary>
+        [HttpPut("users/{userId}")]
+        public async Task<ActionResult<ApiResponse<UserDetailDto>>> UpdateUser(long userId, [FromBody] AdminUpdateUserDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse<UserDetailDto>.FailResponse("Invalid request data"));
+
+            var result = await _adminService.AdminUpdateUserAsync(userId, request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<UserDetailDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<UserDetailDto>.SuccessResponse(result.Data!, result.Message));
+        }
+
+        /// <summary>
+        /// Delete user (admin only)
+        /// </summary>
+        [HttpDelete("users/{userId}")]
+        public async Task<ActionResult<ApiResponse>> DeleteUser(long userId)
+        {
+            var result = await _adminService.AdminDeleteUserAsync(userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
         }
 
         /// <summary>

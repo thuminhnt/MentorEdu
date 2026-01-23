@@ -95,6 +95,116 @@ Content-Type: application/json
 
 **Mô t?**: Xem chi ti?t thông tin user
 
+### POST `/api/admin/users` ? NEW
+
+**Mô t?**: T?o user m?i (admin only)
+
+**Request Body**:
+```json
+{
+  "email": "newuser@example.com",
+  "password": "password123",
+  "fullName": "Nguyen Van New",
+  "role": "Student",
+  "phone": "0901234567",
+  "gender": "Male",
+  "school": "HCMUT",
+  "major": "Computer Science",
+  "bio": "Student bio here",
+  "city": "Ho Chi Minh",
+  "country": "Vietnam",
+  "isVerified": false,
+  "isActive": true
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "id": 151,
+    "email": "newuser@example.com",
+    "fullName": "Nguyen Van New",
+    "role": "Student",
+    "isVerified": false,
+    "isActive": true,
+    "createdAt": "2026-01-23T12:00:00Z"
+  }
+}
+```
+
+**Logic**:
+- Ki?m tra email unique
+- Hash password v?i BCrypt
+- T?o User, UserProfile, Wallet
+- N?u role = Mentor: t?o MentorProfile m?c ??nh
+- Transaction safety
+
+### PUT `/api/admin/users/{userId}` ? NEW
+
+**Mô t?**: C?p nh?t thông tin user (admin only)
+
+**Request Body**:
+```json
+{
+  "email": "updated@example.com",
+  "fullName": "Nguyen Van Updated",
+  "phone": "0909999999",
+  "gender": "Male",
+  "school": "HCMUT",
+  "major": "Software Engineering",
+  "bio": "Updated bio",
+  "city": "Ho Chi Minh",
+  "country": "Vietnam",
+  "isVerified": true,
+  "isActive": true
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "User updated successfully",
+  "data": {
+    "id": 151,
+    "email": "updated@example.com",
+    "fullName": "Nguyen Van Updated",
+    "role": "Student",
+    "isVerified": true,
+    "isActive": true
+  }
+}
+```
+
+**Logic**:
+- Không th? update admin account
+- Ki?m tra email unique (n?u thay ??i)
+- C?p nh?t User và UserProfile
+
+### DELETE `/api/admin/users/{userId}` ? NEW
+
+**Mô t?**: Xóa user (hard delete, admin only)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "User deleted successfully"
+}
+```
+
+**Logic**:
+- Không th? xóa admin account
+- Không th? xóa n?u có active orders
+- Không th? xóa n?u wallet balance > 0
+- Cascade delete: UserProfile, MentorProfile, Wallet
+- Transaction safety
+
+**L?u ý**: ?ây là hard delete, dùng ban/deactivate cho soft delete.
+
 ### POST `/api/admin/users/{userId}/activate`
 
 **Mô t?**: Kích ho?t tài kho?n user b? deactivate
