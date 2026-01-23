@@ -274,6 +274,19 @@ namespace MentorEdu.Services.Implementations
             user.IsActive = request.IsActive;
             user.UpdatedAt = DateTime.UtcNow;
 
+            // ? Update password if provided
+            if (!string.IsNullOrWhiteSpace(request.Password))
+            {
+                // ?? DEBUG LOG
+                Console.WriteLine($"?? Updating password for user {userId}. Old hash: {user.PasswordHash?.Substring(0, 20)}...");
+                user.PasswordHash = HashPassword(request.Password);
+                Console.WriteLine($"?? New hash: {user.PasswordHash?.Substring(0, 20)}...");
+            }
+            else
+            {
+                Console.WriteLine($"?? No password provided for user {userId}");
+            }
+
             _unitOfWork.Users.Update(user);
 
             // Update user profile
