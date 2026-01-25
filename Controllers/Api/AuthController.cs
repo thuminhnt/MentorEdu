@@ -1,6 +1,9 @@
 using MentorEdu.DTOs.Auth;
 using MentorEdu.DTOs.Common;
+using MentorEdu.Models.Enums;
 using MentorEdu.Services.Interfaces;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -159,6 +162,74 @@ namespace MentorEdu.Controllers.Api
 
             return Ok(ApiResponse.SuccessResponse(result.Message));
         }
+
+        #region Google OAuth
+
+        /// <summary>
+        /// Initiate Google OAuth login - redirects to Google
+        /// </summary>
+        [HttpGet("google-login")]
+        public IActionResult GoogleLogin([FromQuery] string? returnUrl = null, [FromQuery] int? role = null)
+        {
+            var properties = new AuthenticationProperties
+            {
+                RedirectUri = Url.Action(nameof(GoogleCallback)),
+                Items = { { "returnUrl", returnUrl ?? "/" } }
+            };
+            
+            if (role.HasValue)
+            {
+                properties.Items.Add("role", role.Value.ToString());
+            }
+
+            return Challenge(properties, GoogleDefaults.AuthenticationScheme);
+        }
+
+        /// <summary>
+        /// Google OAuth callback - handles the response from Google
+        /// </summary>
+        [HttpGet("google-callback")]
+        public async Task<IActionResult> GoogleCallback()
+        {
+            var authenticateResult = await HttpContext.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
+
+            if (!authenticateResult.Succeeded)
+            {
+                // Redirect to frontend with error
+                return Redirect("http://localhost:5173/login?error=Authentication%20failed");
+            }
+
+            var claims = authenticateResult.Principal?.Identities.FirstOrDefault()?.Claims;
+            var email = claims?.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            var name = claims?.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "";
+            var avatarUrl = claims?.FirstOrDefault(c => c.Type == "picture")?.Value;
+            
+            if (string.IsNullOrEmpty(email))
+            {
+                return Redirect("http://localhost:5173/login?error=Email%20not%20found");
+            }
+
+            // Get role from state if provided
+            UserRole? role = null;
+            if (authenticateResult.Properties?.Items.TryGetValue("role", out var roleStr) == true 
+                && int.TryParse(roleStr, out var roleInt))
+            {
+                role = (UserRole)roleInt;
+            }
+
+            var result = await _authService.GoogleLoginAsync(email, name, avatarUrl, role);
+
+            if (!result.Success)
+            {
+                var errorMessage = Uri.EscapeDataString(result.Message ?? "Login failed");
+                return Redirect($"http://localhost:5173/login?error={errorMessage}");
+            }
+
+            // Redirect back to frontend with tokens
+            return Redirect($"http://localhost:5173/login?token={result.Data!.Token}&refreshToken={result.Data.RefreshToken}");
+        }
+
+        #endregion
 
         private long GetCurrentUserId()
         {

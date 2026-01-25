@@ -130,6 +130,40 @@ namespace MentorEdu.Controllers.Api
             return Ok(ApiResponse.SuccessResponse(result.Message));
         }
 
+        /// <summary>
+        /// Apply to become a mentor (from profile page)
+        /// Requires: Specialization, ExperienceYears, Introduction, PortfolioUrl, CertificationUrls
+        /// </summary>
+        [HttpPost("apply-mentor")]
+        public async Task<ActionResult<ApiResponse>> ApplyAsMentor([FromBody] ApplyAsMentorRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.FailResponse("Invalid request data"));
+
+            var userId = GetCurrentUserId();
+            var result = await _userService.ApplyAsMentorAsync(userId, request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// Get mentor application status for current user
+        /// </summary>
+        [HttpGet("mentor-application-status")]
+        public async Task<ActionResult<ApiResponse<MentorApplicationStatusDto>>> GetMentorApplicationStatus()
+        {
+            var userId = GetCurrentUserId();
+            var result = await _userService.GetMentorApplicationStatusAsync(userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<MentorApplicationStatusDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<MentorApplicationStatusDto>.SuccessResponse(result.Data!));
+        }
+
         private long GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

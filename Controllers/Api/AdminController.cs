@@ -678,6 +678,74 @@ namespace MentorEdu.Controllers.Api
 
         #endregion
 
+        #region Mentor Applications Management
+
+        /// <summary>
+        /// Get all mentor applications with filters
+        /// </summary>
+        [HttpGet("mentor-applications")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<MentorApplicationDto>>>> GetMentorApplications(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] MentorApprovalStatus? status = null)
+        {
+            var result = await _adminService.GetMentorApplicationsAsync(pageNumber, pageSize, status);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<MentorApplicationDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<MentorApplicationDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get mentor application detail by user ID
+        /// </summary>
+        [HttpGet("mentor-applications/{userId}")]
+        public async Task<ActionResult<ApiResponse<MentorApplicationDto>>> GetMentorApplicationDetail(long userId)
+        {
+            var result = await _adminService.GetMentorApplicationDetailAsync(userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<MentorApplicationDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<MentorApplicationDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Approve a mentor application - changes user role to Mentor
+        /// </summary>
+        [HttpPost("mentor-applications/{userId}/approve")]
+        public async Task<ActionResult<ApiResponse>> ApproveMentorApplication(long userId)
+        {
+            var adminId = GetCurrentUserId();
+            var result = await _adminService.ApproveMentorApplicationAsync(userId, adminId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// Reject a mentor application
+        /// </summary>
+        [HttpPost("mentor-applications/{userId}/reject")]
+        public async Task<ActionResult<ApiResponse>> RejectMentorApplication(long userId, [FromBody] RejectMentorRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return BadRequest(ApiResponse.FailResponse("Rejection reason is required"));
+
+            var adminId = GetCurrentUserId();
+            var result = await _adminService.RejectMentorApplicationAsync(userId, adminId, request.Reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
         #region Helper Methods
 
         private long GetCurrentUserId()

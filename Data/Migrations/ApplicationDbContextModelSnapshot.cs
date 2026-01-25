@@ -270,9 +270,21 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("user_id");
 
+                    b.Property<string>("ApplicationNote")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("application_note");
+
+                    b.Property<int>("ApprovalStatus")
+                        .HasColumnType("int")
+                        .HasColumnName("approval_status");
+
                     b.Property<string>("AvailabilityNote")
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("availability_note");
+
+                    b.Property<string>("CertificationUrls")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("certification_urls");
 
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("datetime2")
@@ -294,6 +306,11 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("package_price");
 
+                    b.Property<string>("PortfolioUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("portfolio_url");
+
                     b.Property<decimal?>("RatingAvg")
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("rating_avg");
@@ -301,6 +318,23 @@ namespace MentorEdu.Data.Migrations
                     b.Property<int?>("RatingCount")
                         .HasColumnType("int")
                         .HasColumnName("rating_count");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<long?>("ReviewedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reviewed_by");
+
+                    b.Property<string>("Specialization")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("specialization");
 
                     b.Property<string>("Title")
                         .HasMaxLength(255)
@@ -312,6 +346,8 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("UserId");
+
+                    b.HasIndex("ReviewedBy");
 
                     b.ToTable("mentor_profiles", (string)null);
                 });
@@ -1403,11 +1439,17 @@ namespace MentorEdu.Data.Migrations
 
             modelBuilder.Entity("MentorEdu.Models.MentorProfile", b =>
                 {
+                    b.HasOne("MentorEdu.Models.User", "Reviewer")
+                        .WithMany()
+                        .HasForeignKey("ReviewedBy");
+
                     b.HasOne("MentorEdu.Models.User", "User")
                         .WithOne("MentorProfile")
                         .HasForeignKey("MentorEdu.Models.MentorProfile", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Reviewer");
 
                     b.Navigation("User");
                 });

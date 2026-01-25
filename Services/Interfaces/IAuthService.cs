@@ -1,4 +1,5 @@
 using MentorEdu.DTOs.Auth;
+using MentorEdu.Models.Enums;
 using MentorEdu.Services.Common;
 
 namespace MentorEdu.Services.Interfaces
@@ -14,5 +15,8 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<LoginResponse>> RefreshTokenAsync(RefreshTokenRequest request);
         Task<ServiceResult> VerifyEmailAsync(string token, string email);
         Task<ServiceResult> ResendVerificationEmailAsync(string email);
+        
+        // Google OAuth
+        Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null);
     }
 }
