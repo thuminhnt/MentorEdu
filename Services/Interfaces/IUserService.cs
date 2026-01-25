@@ -20,6 +20,10 @@ namespace MentorEdu.Services.Interfaces
         // Student specific
         Task<ServiceResult<PagedResponse<UserBasicDto>>> GetStudentsAsync(int pageNumber, int pageSize);
         
+        // Mentor Application (from Profile page)
+        Task<ServiceResult> ApplyAsMentorAsync(long userId, ApplyAsMentorRequest request);
+        Task<ServiceResult<MentorApplicationStatusDto>> GetMentorApplicationStatusAsync(long userId);
+        
         // Account management
         Task<ServiceResult> DeactivateAccountAsync(long userId);
         Task<ServiceResult> DeleteAccountAsync(long userId);

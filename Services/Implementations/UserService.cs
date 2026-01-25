@@ -243,6 +243,105 @@ namespace MentorEdu.Services.Implementations
             return ServiceResult.SuccessResult("Account deleted successfully");
         }
 
+        public async Task<ServiceResult> ApplyAsMentorAsync(long userId, ApplyAsMentorRequest request)
+        {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            // Check if already a mentor
+            if (user.Role == UserRole.Mentor)
+                return ServiceResult.FailResult("Bạn đã là Mentor rồi");
+
+            // Check if already has pending application
+            var existingProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+            if (existingProfile != null)
+            {
+                if (existingProfile.ApprovalStatus == MentorApprovalStatus.Pending)
+                    return ServiceResult.FailResult("Bạn đã có đơn đăng ký đang chờ duyệt");
+                if (existingProfile.ApprovalStatus == MentorApprovalStatus.Approved)
+                    return ServiceResult.FailResult("Đơn đăng ký của bạn đã được duyệt");
+            }
+
+            // Create or update mentor profile
+            if (existingProfile == null)
+            {
+                existingProfile = new MentorProfile
+                {
+                    UserId = userId,
+                    RatingAvg = 0,
+                    RatingCount = 0,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.MentorProfiles.AddAsync(existingProfile);
+            }
+
+            // Update with application data
+            existingProfile.ApprovalStatus = MentorApprovalStatus.Pending;
+            existingProfile.Specialization = request.Specialization;
+            existingProfile.ExperienceYears = request.ExperienceYears;
+            existingProfile.Introduction = request.Introduction;
+            existingProfile.PortfolioUrl = request.PortfolioUrl;
+            existingProfile.CertificationUrls = request.CertificationUrls;
+            existingProfile.ApplicationNote = request.ApplicationNote;
+            existingProfile.UpdatedAt = DateTime.UtcNow;
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Đơn đăng ký mentor đã được gửi. Vui lòng chờ admin phê duyệt.");
+        }
+
+        public async Task<ServiceResult<MentorApplicationStatusDto>> GetMentorApplicationStatusAsync(long userId)
+        {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            
+            if (user == null)
+                return ServiceResult<MentorApplicationStatusDto>.NotFoundResult("User not found");
+
+            // Already a mentor
+            if (user.Role == UserRole.Mentor)
+            {
+                return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto
+                {
+                    HasApplied = true,
+                    Status = MentorApprovalStatus.Approved,
+                    StatusText = "Bạn đã là Mentor"
+                });
+            }
+
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+            
+            if (mentorProfile == null)
+            {
+                return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto
+                {
+                    HasApplied = false,
+                    StatusText = "Bạn chưa đăng ký làm Mentor"
+                });
+            }
+
+            var statusText = mentorProfile.ApprovalStatus switch
+            {
+                MentorApprovalStatus.Pending => "Đơn đăng ký đang chờ duyệt",
+                MentorApprovalStatus.Approved => "Đơn đăng ký đã được duyệt",
+                MentorApprovalStatus.Rejected => $"Đơn đăng ký bị từ chối: {mentorProfile.RejectionReason}",
+                _ => "Không xác định"
+            };
+
+            return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto
+            {
+                HasApplied = true,
+                Status = mentorProfile.ApprovalStatus,
+                StatusText = statusText,
+                AppliedAt = mentorProfile.CreatedAt,
+                ReviewedAt = mentorProfile.ReviewedAt,
+                RejectionReason = mentorProfile.RejectionReason,
+                Specialization = mentorProfile.Specialization,
+                ExperienceYears = mentorProfile.ExperienceYears
+            });
+        }
+
         #region Private Methods
 
         private async Task<UserDetailDto> MapToUserDetailDto(User user)

@@ -1560,6 +1560,177 @@ namespace MentorEdu.Services.Implementations
 
         #endregion
 
+        #region Mentor Applications Management
+
+        public async Task<ServiceResult<PagedResponse<MentorApplicationDto>>> GetMentorApplicationsAsync(int pageNumber = 1, int pageSize = 10, MentorApprovalStatus? status = null)
+        {
+            var query = _unitOfWork.MentorProfiles.Query();
+
+            // Filter by status if provided
+            // If status is null, get ALL applications (not just Pending)
+            if (status.HasValue)
+                query = query.Where(mp => mp.ApprovalStatus == status);
+
+            var totalCount = await query.CountAsync();
+
+            var applications = await query
+                .Include(mp => mp.User).ThenInclude(u => u.UserProfile)
+                .Include(mp => mp.Reviewer).ThenInclude(r => r!.UserProfile)
+                .OrderByDescending(mp => mp.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var dtos = applications.Select(mp => new MentorApplicationDto
+            {
+                UserId = mp.UserId,
+                Email = mp.User?.Email ?? "",
+                FullName = mp.User?.UserProfile?.FullName ?? "",
+                AvatarUrl = mp.User?.UserProfile?.AvatarUrl,
+                Specialization = mp.Specialization,
+                ExperienceYears = mp.ExperienceYears,
+                Introduction = mp.Introduction,
+                PortfolioUrl = mp.PortfolioUrl,
+                CertificationUrls = mp.CertificationUrls,
+                ApplicationNote = mp.ApplicationNote,
+                ApprovalStatus = mp.ApprovalStatus,
+                CreatedAt = mp.CreatedAt,
+                ReviewedAt = mp.ReviewedAt,
+                ReviewedByName = mp.Reviewer?.UserProfile?.FullName,
+                RejectionReason = mp.RejectionReason
+            });
+
+            var response = PagedResponse<MentorApplicationDto>.Create(dtos, pageNumber, pageSize, totalCount);
+            return ServiceResult<PagedResponse<MentorApplicationDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult<MentorApplicationDto>> GetMentorApplicationDetailAsync(long userId)
+        {
+            var mentorProfile = await _unitOfWork.MentorProfiles.Query()
+                .Include(mp => mp.User).ThenInclude(u => u.UserProfile)
+                .Include(mp => mp.Reviewer).ThenInclude(r => r!.UserProfile)
+                .FirstOrDefaultAsync(mp => mp.UserId == userId);
+
+            if (mentorProfile == null)
+                return ServiceResult<MentorApplicationDto>.NotFoundResult("Mentor application not found");
+
+            var dto = new MentorApplicationDto
+            {
+                UserId = mentorProfile.UserId,
+                Email = mentorProfile.User?.Email ?? "",
+                FullName = mentorProfile.User?.UserProfile?.FullName ?? "",
+                AvatarUrl = mentorProfile.User?.UserProfile?.AvatarUrl,
+                Specialization = mentorProfile.Specialization,
+                ExperienceYears = mentorProfile.ExperienceYears,
+                Introduction = mentorProfile.Introduction,
+                PortfolioUrl = mentorProfile.PortfolioUrl,
+                CertificationUrls = mentorProfile.CertificationUrls,
+                ApplicationNote = mentorProfile.ApplicationNote,
+                ApprovalStatus = mentorProfile.ApprovalStatus,
+                CreatedAt = mentorProfile.CreatedAt,
+                ReviewedAt = mentorProfile.ReviewedAt,
+                ReviewedByName = mentorProfile.Reviewer?.UserProfile?.FullName,
+                RejectionReason = mentorProfile.RejectionReason
+            };
+
+            return ServiceResult<MentorApplicationDto>.SuccessResult(dto);
+        }
+
+        public async Task<ServiceResult> ApproveMentorApplicationAsync(long userId, long adminId)
+        {
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+
+            if (mentorProfile == null)
+                return ServiceResult.NotFoundResult("Mentor application not found");
+
+            if (mentorProfile.ApprovalStatus == MentorApprovalStatus.Approved)
+                return ServiceResult.FailResult("This application has already been approved");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                // Update mentor profile status
+                mentorProfile.ApprovalStatus = MentorApprovalStatus.Approved;
+                mentorProfile.ReviewedAt = DateTime.UtcNow;
+                mentorProfile.ReviewedBy = adminId;
+                mentorProfile.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.MentorProfiles.Update(mentorProfile);
+
+                // Change user role from Student to Mentor
+                user.Role = UserRole.Mentor;
+                user.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Users.Update(user);
+
+                // Create notification for user
+                var notification = new Notification
+                {
+                    UserId = userId,
+                    Type = NotificationType.System,
+                    Title = "Mentor Application Approved",
+                    Body = "Congratulations! Your mentor application has been approved. You can now start accepting mentoring requests.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Notifications.AddAsync(notification);
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
+                // TODO: Send email notification to user
+
+                return ServiceResult.SuccessResult("Mentor application approved successfully");
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+
+        public async Task<ServiceResult> RejectMentorApplicationAsync(long userId, long adminId, string reason)
+        {
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+
+            if (mentorProfile == null)
+                return ServiceResult.NotFoundResult("Mentor application not found");
+
+            if (mentorProfile.ApprovalStatus != MentorApprovalStatus.Pending)
+                return ServiceResult.FailResult("Only pending applications can be rejected");
+
+            // Update mentor profile status
+            mentorProfile.ApprovalStatus = MentorApprovalStatus.Rejected;
+            mentorProfile.ReviewedAt = DateTime.UtcNow;
+            mentorProfile.ReviewedBy = adminId;
+            mentorProfile.RejectionReason = reason;
+            mentorProfile.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.MentorProfiles.Update(mentorProfile);
+
+            // Create notification for user
+            var notification = new Notification
+            {
+                UserId = userId,
+                Type = NotificationType.System,
+                Title = "Mentor Application Rejected",
+                Body = $"Your mentor application has been rejected. Reason: {reason}",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.Notifications.AddAsync(notification);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // TODO: Send email notification to user
+
+            return ServiceResult.SuccessResult("Mentor application rejected");
+        }
+
+        #endregion
+
         #region Private Methods
 
         private CategoryResponseDto MapToCategoryDto(Category category)

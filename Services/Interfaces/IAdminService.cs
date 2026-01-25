@@ -87,6 +87,13 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<AdminHashtagDto>> CreateHashtagAsync(CreateHashtagDto request);
         Task<ServiceResult> DeleteHashtagAsync(long hashtagId);
         #endregion
+
+        #region Mentor Applications Management
+        Task<ServiceResult<PagedResponse<MentorApplicationDto>>> GetMentorApplicationsAsync(int pageNumber = 1, int pageSize = 10, MentorApprovalStatus? status = null);
+        Task<ServiceResult<MentorApplicationDto>> GetMentorApplicationDetailAsync(long userId);
+        Task<ServiceResult> ApproveMentorApplicationAsync(long userId, long adminId);
+        Task<ServiceResult> RejectMentorApplicationAsync(long userId, long adminId, string reason);
+        #endregion
     }
 
     public class AdminDashboardDto

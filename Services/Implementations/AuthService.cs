@@ -39,6 +39,14 @@ namespace MentorEdu.Services.Implementations
                 return ServiceResult<LoginResponse>.FailResult("Please verify your email before logging in", 403);
 
             var userProfile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
+            
+            // Get mentor status if exists
+            MentorApprovalStatus? mentorStatus = null;
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(user.Id);
+            if (mentorProfile != null)
+            {
+                mentorStatus = mentorProfile.ApprovalStatus;
+            }
 
             var token = GenerateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
@@ -52,7 +60,8 @@ namespace MentorEdu.Services.Implementations
                 AvatarUrl = userProfile?.AvatarUrl,
                 Token = token,
                 RefreshToken = refreshToken,
-                TokenExpiration = DateTime.UtcNow.AddHours(24)
+                TokenExpiration = DateTime.UtcNow.AddHours(24),
+                MentorStatus = mentorStatus
             };
 
             return ServiceResult<LoginResponse>.SuccessResult(response, "Login successful");
@@ -68,12 +77,12 @@ namespace MentorEdu.Services.Implementations
 
             try
             {
-                // Create user
+                // Create user as Student
                 var user = new User
                 {
                     Email = request.Email,
                     PasswordHash = HashPassword(request.Password),
-                    Role = request.Role,
+                    Role = UserRole.Student,
                     IsVerified = false,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
@@ -93,21 +102,6 @@ namespace MentorEdu.Services.Implementations
                 };
 
                 await _unitOfWork.UserProfiles.AddAsync(userProfile);
-
-                // Create mentor profile if role is Mentor
-                if (request.Role == UserRole.Mentor)
-                {
-                    var mentorProfile = new MentorProfile
-                    {
-                        UserId = user.Id,
-                        RatingAvg = 0,
-                        RatingCount = 0,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    };
-
-                    await _unitOfWork.MentorProfiles.AddAsync(mentorProfile);
-                }
 
                 // Create wallet
                 var wallet = new Wallet
@@ -137,10 +131,12 @@ namespace MentorEdu.Services.Implementations
                     Role = user.Role,
                     Token = token,
                     RefreshToken = refreshToken,
-                    TokenExpiration = DateTime.UtcNow.AddHours(24)
+                    TokenExpiration = DateTime.UtcNow.AddHours(24),
+                    MentorStatus = null
                 };
 
-                return ServiceResult<LoginResponse>.CreatedResult(response, "Registration successful. Please check your email to verify your account.");
+                return ServiceResult<LoginResponse>.CreatedResult(response, 
+                    "Registration successful. Please check your email to verify your account.");
             }
             catch (Exception)
             {
@@ -348,6 +344,105 @@ namespace MentorEdu.Services.Implementations
         private static bool VerifyPassword(string password, string passwordHash)
         {
             return BCrypt.Net.BCrypt.Verify(password, passwordHash);
+        }
+
+        #endregion
+
+        #region Google OAuth
+
+        public async Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null)
+        {
+            // Check if user exists
+            var user = await _unitOfWork.Users.GetByEmailAsync(email);
+            
+            if (user == null)
+            {
+                // Create new user from Google account - ALWAYS as Student
+                await _unitOfWork.BeginTransactionAsync();
+                
+                try
+                {
+                    user = new User
+                    {
+                        Email = email,
+                        PasswordHash = HashPassword(Guid.NewGuid().ToString()), // Random password for OAuth users
+                        Role = UserRole.Student, // Always Student - can apply for mentor later
+                        IsVerified = true, // Google accounts are pre-verified
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.Users.AddAsync(user);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    // Create user profile
+                    var userProfile = new UserProfile
+                    {
+                        UserId = user.Id,
+                        FullName = name,
+                        AvatarUrl = avatarUrl,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.UserProfiles.AddAsync(userProfile);
+
+                    // Create wallet
+                    var wallet = new Wallet
+                    {
+                        UserId = user.Id,
+                        Balance = 0,
+                        LockedBalance = 0,
+                        Currency = "VND",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.Wallets.AddAsync(wallet);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+                }
+                catch (Exception)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    throw;
+                }
+            }
+            else if (!user.IsActive)
+            {
+                return ServiceResult<LoginResponse>.FailResult("Account is deactivated", 403);
+            }
+
+            // Get user profile for full name and avatar
+            var profile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
+            
+            // Get mentor status if exists
+            MentorApprovalStatus? mentorStatus = null;
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(user.Id);
+            if (mentorProfile != null)
+            {
+                mentorStatus = mentorProfile.ApprovalStatus;
+            }
+
+            // Generate tokens
+            var token = GenerateJwtToken(user);
+            var refreshToken = GenerateRefreshToken();
+
+            var response = new LoginResponse
+            {
+                UserId = user.Id,
+                Email = user.Email,
+                FullName = profile?.FullName ?? name,
+                Role = user.Role,
+                AvatarUrl = profile?.AvatarUrl ?? avatarUrl,
+                Token = token,
+                RefreshToken = refreshToken,
+                TokenExpiration = DateTime.UtcNow.AddHours(24),
+                MentorStatus = mentorStatus
+            };
+
+            return ServiceResult<LoginResponse>.SuccessResult(response, "Google login successful");
         }
 
         #endregion

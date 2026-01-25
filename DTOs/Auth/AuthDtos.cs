@@ -4,7 +4,8 @@ using MentorEdu.Models.Enums;
 namespace MentorEdu.DTOs.Auth
 {
     /// <summary>
-    /// Register Request
+    /// Register Request - Basic registration only
+    /// For mentor application, use POST /api/user/apply-mentor after login
     /// </summary>
     public class RegisterRequest
     {
@@ -24,9 +25,6 @@ namespace MentorEdu.DTOs.Auth
         [Required(ErrorMessage = "Full name is required")]
         [MaxLength(255)]
         public string FullName { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Role is required")]
-        public UserRole Role { get; set; }
     }
 
     /// <summary>
@@ -57,6 +55,11 @@ namespace MentorEdu.DTOs.Auth
         public string Token { get; set; } = string.Empty;
         public string RefreshToken { get; set; } = string.Empty;
         public DateTime TokenExpiration { get; set; }
+        
+        /// <summary>
+        /// Mentor approval status (null if never applied, Pending/Approved/Rejected if applied)
+        /// </summary>
+        public MentorApprovalStatus? MentorStatus { get; set; }
     }
 
     /// <summary>
@@ -117,5 +120,16 @@ namespace MentorEdu.DTOs.Auth
 
         [Required]
         public string RefreshToken { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Google Login Request - used when frontend initiates Google login
+    /// </summary>
+    public class GoogleLoginRequest
+    {
+        /// <summary>
+        /// Optional role for new user registration via Google
+        /// </summary>
+        public UserRole? Role { get; set; }
     }
 }
