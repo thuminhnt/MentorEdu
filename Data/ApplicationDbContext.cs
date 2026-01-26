@@ -51,6 +51,9 @@ namespace MentorEdu.Data
         public DbSet<CommunityPost> CommunityPosts { get; set; }
         public DbSet<CommunityComment> CommunityComments { get; set; }
 
+        // Verification Tokens
+        public DbSet<VerificationToken> VerificationTokens { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -87,6 +90,7 @@ namespace MentorEdu.Data
 
             modelBuilder.Entity<CommunityPost>().ToTable("community_posts");
             modelBuilder.Entity<CommunityComment>().ToTable("community_comments");
+            modelBuilder.Entity<VerificationToken>().ToTable("verification_tokens");
 
             // User - Unique Email
             modelBuilder.Entity<User>()

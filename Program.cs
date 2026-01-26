@@ -1,5 +1,6 @@
-using MentorEdu.Data;
+﻿using MentorEdu.Data;
 using MentorEdu.Hubs;
+using MentorEdu.Models;
 using MentorEdu.Repositories.Implementations;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Implementations;
@@ -12,25 +13,47 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+// =======================
+// DATABASE
+// =======================
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
+
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+// =======================
+// IDENTITY
+// =======================
+builder.Services
+    .AddDefaultIdentity<IdentityUser>(options =>
+    {
+        options.SignIn.RequireConfirmedAccount = true;
+    })
     .AddEntityFrameworkStores<ApplicationDbContext>();
-builder.Services.AddControllers();
 
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// JWT Configuration
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "MentorEduSecretKey123456789012345678901234567890";
+// =======================
+// JWT CONFIG
+// =======================
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? "MentorEduSecretKey123456789012345678901234567890";
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "MentorEdu";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "MentorEduApp";
 
-builder.Services.AddAuthentication(options =>
+// =======================
+// AUTHENTICATION
+// =======================
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+
+var authBuilder = builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -55,44 +78,67 @@ builder.Services.AddAuthentication(options =>
         {
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
-            
-            // If the request is for SignalR hub
-            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+
+            if (!string.IsNullOrEmpty(accessToken) &&
+                path.StartsWithSegments("/hubs/chat"))
             {
                 context.Token = accessToken;
             }
+
             return Task.CompletedTask;
         }
     };
-})
-.AddGoogle(options =>
-{
-    options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
-    options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
-    options.CallbackPath = "/signin-google";
-    options.SaveTokens = true;
 });
 
-// Add SignalR
+// =======================
+// GOOGLE OAUTH (OPTIONAL)
+// =======================
+if (!string.IsNullOrWhiteSpace(googleClientId) &&
+    !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authBuilder.AddGoogle(options =>
+    {
+        options.ClientId = googleClientId!;
+        options.ClientSecret = googleClientSecret!;
+        options.CallbackPath = "/signin-google";
+        options.SaveTokens = true;
+        
+        options.Events.OnRedirectToAuthorizationEndpoint = context =>
+        {
+            var uri = context.RedirectUri + "&prompt=select_account";
+            context.Response.Redirect(uri);
+            return Task.CompletedTask;
+        };
+    });
+}
+
+// =======================
+// SIGNALR
+// =======================
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     options.MaximumReceiveMessageSize = 102400; // 100 KB
 });
 
-// CORS Configuration for React frontend
+// =======================
+// CORS
+// =======================
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173") // React dev servers
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials(); // Required for SignalR
+        policy
+            .WithOrigins("http://localhost:3000", "http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); // Required for SignalR
     });
 });
 
-// Register Repositories
+// =======================
+// REPOSITORIES
+// =======================
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
@@ -115,11 +161,22 @@ builder.Services.AddScoped<IReportRepository, ReportRepository>();
 builder.Services.AddScoped<ICommunityPostRepository, CommunityPostRepository>();
 builder.Services.AddScoped<ICommunityCommentRepository, CommunityCommentRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
 
-// Register Unit of Work
+// =======================
+// UNIT OF WORK
+// =======================
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-// Register Services
+// =======================
+// EMAIL SETTINGS
+// =======================
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+
+// =======================
+// SERVICES
+// =======================
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IMentorService, MentorService>();
@@ -132,22 +189,28 @@ builder.Services.AddScoped<ICommunityService, CommunityService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 
+// =======================
+// APP
+// =======================
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
     app.UseSwagger();
-    app.UseSwaggerUI();
-    
-    // Redirect root to Swagger
-    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "MentorEdu API V1");
+        c.RoutePrefix = string.Empty; // serve Swagger UI at root '/'
+    });
+
+    // Redirect /index.html to root to handle browsers that request index.html explicitly
+    app.MapGet("/index.html", () => Results.Redirect("/"))
+        .ExcludeFromDescription();
 }
 else
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -156,23 +219,28 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// Enable CORS
+// CORS phải đặt TRƯỚC Auth
 app.UseCors("AllowReactApp");
-
+app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers(); // API controllers - Priority
+// API Controllers
+app.MapControllers();
 
-app.MapControllerRoute( // MVC controllers - Sau API
+// MVC Controllers
+app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
 app.MapRazorPages();
 
-// Map SignalR Hub
+// SignalR Hub
 app.MapHub<ChatHub>("/hubs/chat");
 
-// Seed database
+// =======================
+// SEED DATABASE
+// =======================
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
