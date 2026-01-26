@@ -44,15 +44,26 @@ namespace MentorEdu.Controllers.Api
         [HttpPost("login")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequest request)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ApiResponse<LoginResponse>.FailResponse("Invalid request data"));
+            try
+            {
+                if (!ModelState.IsValid)
+                    return BadRequest(ApiResponse<LoginResponse>.FailResponse("Invalid request data"));
 
-            var result = await _authService.LoginAsync(request);
+                var result = await _authService.LoginAsync(request);
 
-            if (!result.Success)
-                return StatusCode(result.StatusCode, ApiResponse<LoginResponse>.FailResponse(result.Message ?? ""));
+                if (!result.Success)
+                    return StatusCode(result.StatusCode, ApiResponse<LoginResponse>.FailResponse(result.Message ?? ""));
 
-            return Ok(ApiResponse<LoginResponse>.SuccessResponse(result.Data!, result.Message));
+                return Ok(ApiResponse<LoginResponse>.SuccessResponse(result.Data!, result.Message));
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    ApiResponse<LoginResponse>.FailResponse("Something went wrong. Please try again later.")
+                );
+            }
         }
 
         /// <summary>
@@ -169,12 +180,15 @@ namespace MentorEdu.Controllers.Api
         /// Initiate Google OAuth login - redirects to Google
         /// </summary>
         [HttpGet("google-login")]
-        public IActionResult GoogleLogin([FromQuery] string? returnUrl = null, [FromQuery] int? role = null)
+        public IActionResult GoogleLogin([FromQuery] string? returnUrl = null, [FromQuery] int? role = null, [FromQuery] string? mode = null)
         {
             var properties = new AuthenticationProperties
             {
                 RedirectUri = Url.Action(nameof(GoogleCallback)),
-                Items = { { "returnUrl", returnUrl ?? "/" } }
+                Items = { 
+                    { "returnUrl", returnUrl ?? "/" },
+                    { "mode", mode ?? "" }
+                }
             };
             
             if (role.HasValue)
@@ -217,7 +231,11 @@ namespace MentorEdu.Controllers.Api
                 role = (UserRole)roleInt;
             }
 
-            var result = await _authService.GoogleLoginAsync(email, name, avatarUrl, role);
+            // Get mode from state
+            var mode = authenticateResult.Properties?.Items.TryGetValue("mode", out var modeStr) == true ? modeStr : null;
+            var isRegisterRequest = mode == "register";
+
+            var result = await _authService.GoogleLoginAsync(email, name, avatarUrl, role, isRegisterRequest);
 
             if (!result.Success)
             {

@@ -15,11 +15,19 @@ namespace MentorEdu.Services.Implementations
     public class AuthService : BaseService, IAuthService
     {
         private readonly IConfiguration _configuration;
+        private readonly IEmailService _emailService;
+        private readonly IVerificationTokenRepository _tokenRepository;
 
-        public AuthService(IUnitOfWork unitOfWork, IConfiguration configuration) 
+        public AuthService(
+            IUnitOfWork unitOfWork, 
+            IConfiguration configuration,
+            IEmailService emailService,
+            IVerificationTokenRepository tokenRepository) 
             : base(unitOfWork)
         {
             _configuration = configuration;
+            _emailService = emailService;
+            _tokenRepository = tokenRepository;
         }
 
         public async Task<ServiceResult<LoginResponse>> LoginAsync(LoginRequest request)
@@ -115,10 +123,31 @@ namespace MentorEdu.Services.Implementations
                 };
 
                 await _unitOfWork.Wallets.AddAsync(wallet);
+
+                // Create verification token
+                var verificationToken = new VerificationToken
+                {
+                    UserId = user.Id,
+                    Token = GenerateVerificationToken(),
+                    Type = TokenType.EmailVerification,
+                    ExpiresAt = DateTime.UtcNow.AddHours(24),
+                    IsUsed = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _tokenRepository.AddAsync(verificationToken);
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitTransactionAsync();
 
-                // TODO: Send verification email
+                // Send verification email (don't fail registration if email fails)
+                try
+                {
+                    await _emailService.SendVerificationEmailAsync(user.Email, request.FullName, verificationToken.Token);
+                }
+                catch (Exception)
+                {
+                    // Log error but don't fail registration
+                }
 
                 var token = GenerateJwtToken(user);
                 var refreshToken = GenerateRefreshToken();
@@ -176,25 +205,57 @@ namespace MentorEdu.Services.Implementations
             var user = await _unitOfWork.Users.GetByEmailAsync(request.Email);
             
             if (user == null)
-                return ServiceResult.SuccessResult("If the email exists, you will receive a password reset link");
+                return ServiceResult.SuccessResult("If the email address exists, you will receive a password reset link.");
 
-            // TODO: Generate reset token and send email
+            // Invalidate old tokens
+            await _tokenRepository.InvalidateAllTokensForUserAsync(user.Id, TokenType.PasswordReset);
+
+            // Create new reset token
+            var resetToken = new VerificationToken
+            {
+                UserId = user.Id,
+                Token = GenerateVerificationToken(),
+                Type = TokenType.PasswordReset,
+                ExpiresAt = DateTime.UtcNow.AddHours(1),
+                IsUsed = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _tokenRepository.AddAsync(resetToken);
+            await _unitOfWork.SaveChangesAsync();
+
+            var userProfile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
+            
+            try
+            {
+                await _emailService.SendPasswordResetEmailAsync(user.Email, userProfile?.FullName ?? "User", resetToken.Token);
+            }
+            catch (Exception)
+            {
+                // Log error but return success to prevent email enumeration
+            }
 
             return ServiceResult.SuccessResult("If the email exists, you will receive a password reset link");
         }
 
         public async Task<ServiceResult> ResetPasswordAsync(ResetPasswordRequest request)
         {
-            // TODO: Validate reset token
-            var user = await _unitOfWork.Users.GetByEmailAsync(request.Email);
+            var tokenEntity = await _tokenRepository.GetValidTokenAsync(request.Token, request.Email, TokenType.PasswordReset);
             
+            if (tokenEntity == null)
+                return ServiceResult.FailResult("Invalid or expired password reset link");
+
+            var user = tokenEntity.User;
             if (user == null)
-                return ServiceResult.FailResult("Invalid or expired token");
+                return ServiceResult.FailResult("User not found");
 
             user.PasswordHash = HashPassword(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
+            tokenEntity.IsUsed = true;
+
             _unitOfWork.Users.Update(user);
+            _tokenRepository.Update(tokenEntity);
             await _unitOfWork.SaveChangesAsync();
 
             return ServiceResult.SuccessResult("Password reset successful");
@@ -236,18 +297,35 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult> VerifyEmailAsync(string token, string email)
         {
-            var user = await _unitOfWork.Users.GetByEmailAsync(email);
+            var tokenEntity = await _tokenRepository.GetValidTokenAsync(token, email, TokenType.EmailVerification);
             
+            if (tokenEntity == null)
+            {
+                // Token is invalid or expired - but check if user is already verified
+                var existingUser = await _unitOfWork.Users.GetByEmailAsync(email);
+                if (existingUser != null && existingUser.IsVerified)
+                {
+                    return ServiceResult.SuccessResult("Email has already been verified");
+                }
+                return ServiceResult.FailResult("Invalid or expired verification link");
+            }
+
+            var user = tokenEntity.User;
             if (user == null)
-                return ServiceResult.FailResult("Invalid token");
+                return ServiceResult.FailResult("User not found");
+
+            if (user.IsVerified)
+                return ServiceResult.SuccessResult("Email has already been verified");
 
             user.IsVerified = true;
             user.UpdatedAt = DateTime.UtcNow;
+            tokenEntity.IsUsed = true;
 
             _unitOfWork.Users.Update(user);
+            _tokenRepository.Update(tokenEntity);
             await _unitOfWork.SaveChangesAsync();
 
-            return ServiceResult.SuccessResult("Email verified successfully");
+            return ServiceResult.SuccessResult("Email verified successfully! You can now log in.");
         }
 
         public async Task<ServiceResult> ResendVerificationEmailAsync(string email)
@@ -260,12 +338,46 @@ namespace MentorEdu.Services.Implementations
             if (user.IsVerified)
                 return ServiceResult.FailResult("Email has already been verified");
 
-            // TODO: Generate new verification token and send email
+            // Invalidate old tokens
+            await _tokenRepository.InvalidateAllTokensForUserAsync(user.Id, TokenType.EmailVerification);
 
-            return ServiceResult.SuccessResult("Verification email has been resent");
+            // Create new verification token
+            var verificationToken = new VerificationToken
+            {
+                UserId = user.Id,
+                Token = GenerateVerificationToken(),
+                Type = TokenType.EmailVerification,
+                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                IsUsed = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _tokenRepository.AddAsync(verificationToken);
+            await _unitOfWork.SaveChangesAsync();
+
+            var userProfile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
+
+            try
+            {
+                await _emailService.SendVerificationEmailAsync(user.Email, userProfile?.FullName ?? "User", verificationToken.Token);
+            }
+            catch (Exception)
+            {
+                // Log error but return success
+            }
+
+            return ServiceResult.SuccessResult("Verification email has been resent. Please check your inbox.");
         }
 
         #region Private Methods
+
+        private string GenerateVerificationToken()
+        {
+            var randomNumber = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber).Replace("+", "-").Replace("/", "_").Replace("=", "");
+        }
 
         private string GenerateJwtToken(User user)
         {
@@ -350,11 +462,16 @@ namespace MentorEdu.Services.Implementations
 
         #region Google OAuth
 
-        public async Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null)
+        public async Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null, bool isRegisterRequest = false)
         {
             // Check if user exists
             var user = await _unitOfWork.Users.GetByEmailAsync(email);
             
+            if (user != null && isRegisterRequest)
+            {
+                return ServiceResult<LoginResponse>.FailResult("Email này đã được đăng ký. Vui lòng đăng nhập.", 400);
+            }
+
             if (user == null)
             {
                 // Create new user from Google account - ALWAYS as Student
@@ -411,7 +528,7 @@ namespace MentorEdu.Services.Implementations
             }
             else if (!user.IsActive)
             {
-                return ServiceResult<LoginResponse>.FailResult("Account is deactivated", 403);
+                return ServiceResult<LoginResponse>.FailResult("Tài khoản đã bị khóa", 403);
             }
 
             // Get user profile for full name and avatar
@@ -442,7 +559,7 @@ namespace MentorEdu.Services.Implementations
                 MentorStatus = mentorStatus
             };
 
-            return ServiceResult<LoginResponse>.SuccessResult(response, "Google login successful");
+            return ServiceResult<LoginResponse>.SuccessResult(response, "Đăng nhập Google thành công");
         }
 
         #endregion

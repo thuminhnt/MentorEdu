@@ -17,6 +17,6 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult> ResendVerificationEmailAsync(string email);
         
         // Google OAuth
-        Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null);
+        Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null, bool isRegisterRequest = false);
     }
 }

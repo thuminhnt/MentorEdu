@@ -13,7 +13,14 @@ namespace MentorEdu.Repositories.Implementations
 
         public async Task<MentorProfile?> GetByUserIdAsync(long userId)
         {
-            return await _dbSet.FirstOrDefaultAsync(mp => mp.UserId == userId);
+            try
+            {
+                return await _dbSet.FirstOrDefaultAsync(mp => mp.UserId == userId);
+
+            } catch (Exception ex)
+            {
+                throw;
+            }
         }
 
         public async Task<MentorProfile?> GetByUserIdWithDetailsAsync(long userId)
