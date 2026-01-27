@@ -27,5 +27,6 @@ namespace MentorEdu.Models
         public virtual ICollection<Category> Children { get; set; } = new List<Category>();
         public virtual ICollection<Request> Requests { get; set; } = new List<Request>();
         public virtual ICollection<MentorCategory> MentorCategories { get; set; } = new List<MentorCategory>();
+        public virtual ICollection<CategoryHashtag> CategoryHashtags { get; set; } = new List<CategoryHashtag>();
     }
 }

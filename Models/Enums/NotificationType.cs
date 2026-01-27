@@ -10,6 +10,7 @@ namespace MentorEdu.Models.Enums
         OrderStarted,
         OrderCompleted,
         OrderDisputed,
-        WalletTransaction
+        WalletTransaction,
+        RelevantPost  // New: notify mentor about relevant community posts
     }
 }

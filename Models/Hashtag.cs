@@ -16,5 +16,6 @@ namespace MentorEdu.Models
 
         // Navigation Property
         public virtual ICollection<MentorHashtag> MentorHashtags { get; set; } = new List<MentorHashtag>();
+        public virtual ICollection<CategoryHashtag> CategoryHashtags { get; set; } = new List<CategoryHashtag>();
     }
 }

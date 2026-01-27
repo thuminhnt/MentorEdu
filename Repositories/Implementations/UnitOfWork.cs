@@ -15,6 +15,7 @@ namespace MentorEdu.Repositories.Implementations
         private IMentorProfileRepository? _mentorProfiles;
         private ICategoryRepository? _categories;
         private IHashtagRepository? _hashtags;
+        private ICategoryHashtagRepository? _categoryHashtags;
         private IRequestRepository? _requests;
         private IProposalRepository? _proposals;
         private IOrderRepository? _orders;
@@ -53,6 +54,9 @@ namespace MentorEdu.Repositories.Implementations
 
         public IHashtagRepository Hashtags => 
             _hashtags ??= new HashtagRepository(_context);
+
+        public ICategoryHashtagRepository CategoryHashtags => 
+            _categoryHashtags ??= new CategoryHashtagRepository(_context);
 
         // Request, Proposal, Order
         public IRequestRepository Requests => 

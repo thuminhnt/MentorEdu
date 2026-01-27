@@ -59,5 +59,15 @@ namespace MentorEdu.Repositories.Implementations
                        mp.User.MentorCategories.Any(mc => mc.CategoryId == categoryId))
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<long>> GetMentorIdsByCategoryIdAsync(long categoryId)
+        {
+            return await _context.MentorCategories
+                .Include(mc => mc.Mentor)
+                .Where(mc => mc.CategoryId == categoryId && mc.Mentor.IsActive)
+                .Select(mc => mc.MentorId)
+                .Distinct()
+                .ToListAsync();
+        }
     }
 }
