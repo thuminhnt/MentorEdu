@@ -11,37 +11,37 @@ namespace MentorEdu.DTOs.User
         /// <summary>
         /// Mentor's area of expertise
         /// </summary>
-        [Required(ErrorMessage = "Chuyên môn là bắt buộc")]
+        [Required(ErrorMessage = "Specialization is required")]
         [MaxLength(500)]
         public string Specialization { get; set; } = string.Empty;
 
         /// <summary>
         /// Years of professional experience
         /// </summary>
-        [Required(ErrorMessage = "Số năm kinh nghiệm là bắt buộc")]
-        [Range(0, 50, ErrorMessage = "Số năm kinh nghiệm phải từ 0-50")]
+        [Required(ErrorMessage = "Experience years is required")]
+        [Range(0, 50, ErrorMessage = "Experience years must be between 0-50")]
         public int ExperienceYears { get; set; }
 
         /// <summary>
         /// Self introduction / bio
         /// </summary>
-        [Required(ErrorMessage = "Giới thiệu bản thân là bắt buộc")]
-        [MinLength(50, ErrorMessage = "Giới thiệu phải có ít nhất 50 ký tự")]
+        [Required(ErrorMessage = "Introduction is required")]
+        [MinLength(50, ErrorMessage = "Introduction must have at least 50 characters")]
         public string Introduction { get; set; } = string.Empty;
 
         /// <summary>
         /// Portfolio URL (GitHub, LinkedIn, personal website)
         /// </summary>
-        [Required(ErrorMessage = "Link Portfolio (GitHub/LinkedIn) là bắt buộc")]
+        [Required(ErrorMessage = "Portfolio URL (GitHub/LinkedIn) is required")]
         [MaxLength(500)]
-        [Url(ErrorMessage = "Link Portfolio không hợp lệ")]
+        [Url(ErrorMessage = "Invalid Portfolio URL")]
         public string PortfolioUrl { get; set; } = string.Empty;
 
         /// <summary>
         /// Comma-separated URLs of uploaded certification files (from /api/file/upload/certifications)
         /// REQUIRED - Must upload at least 1 file
         /// </summary>
-        [Required(ErrorMessage = "Chứng chỉ là bắt buộc - vui lòng upload ít nhất 1 file")]
+        [Required(ErrorMessage = "Certification is required - please upload at least 1 file")]
         public string CertificationUrls { get; set; } = string.Empty;
 
         /// <summary>

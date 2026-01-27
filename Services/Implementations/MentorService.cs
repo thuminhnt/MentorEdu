@@ -1,11 +1,13 @@
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Review;
 using MentorEdu.DTOs.User;
+using MentorEdu.Models;
 using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace MentorEdu.Services.Implementations
 {
@@ -255,5 +257,182 @@ namespace MentorEdu.Services.Implementations
 
             return ServiceResult<ReviewSummaryDto>.SuccessResult(summary);
         }
+
+        #region Mentor Application Flow
+
+        public async Task<ServiceResult> ApplyAsMentorAsync(long userId, ApplyAsMentorRequest request)
+        {
+            // Check if user exists and is a Student
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            if (user.Role != UserRole.Student)
+                return ServiceResult.FailResult("Only students can apply to become a mentor");
+
+            // Check if already has mentor profile
+            var existingProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+            if (existingProfile != null)
+            {
+                if (existingProfile.ApprovalStatus == MentorApprovalStatus.Pending)
+                    return ServiceResult.FailResult("You already have a pending application");
+                
+                if (existingProfile.ApprovalStatus == MentorApprovalStatus.Approved)
+                    return ServiceResult.FailResult("Your application has already been approved. Please confirm to switch to Mentor role.");
+            }
+
+            // Get submission count for history
+            var submissionCount = await _unitOfWork.MentorApplicationHistories.GetSubmissionCountAsync(userId) + 1;
+
+            await _unitOfWork.BeginTransactionAsync();
+
+            try
+            {
+                // If rejected before, update the existing profile
+                if (existingProfile != null && existingProfile.ApprovalStatus == MentorApprovalStatus.Rejected)
+                {
+                    existingProfile.Specialization = request.Specialization;
+                    existingProfile.ExperienceYears = request.ExperienceYears;
+                    existingProfile.Introduction = request.Introduction;
+                    existingProfile.PortfolioUrl = request.PortfolioUrl;
+                    existingProfile.CertificationUrls = request.CertificationUrls;
+                    existingProfile.ApplicationNote = request.ApplicationNote;
+                    existingProfile.ApprovalStatus = MentorApprovalStatus.Pending;
+                    existingProfile.RejectionReason = null;
+                    existingProfile.ReviewedAt = null;
+                    existingProfile.ReviewedBy = null;
+                    existingProfile.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.MentorProfiles.Update(existingProfile);
+                }
+                else
+                {
+                    // Create new mentor profile
+                    var mentorProfile = new MentorProfile
+                    {
+                        UserId = userId,
+                        Specialization = request.Specialization,
+                        ExperienceYears = request.ExperienceYears,
+                        Introduction = request.Introduction,
+                        PortfolioUrl = request.PortfolioUrl,
+                        CertificationUrls = request.CertificationUrls,
+                        ApplicationNote = request.ApplicationNote,
+                        ApprovalStatus = MentorApprovalStatus.Pending,
+                        HourlyRate = 0,
+                        RatingAvg = 0,
+                        RatingCount = 0,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.MentorProfiles.AddAsync(mentorProfile);
+                }
+
+                // Record history for audit trail and ML training
+                var applicationSnapshot = JsonSerializer.Serialize(new
+                {
+                    request.Specialization,
+                    request.ExperienceYears,
+                    request.Introduction,
+                    request.PortfolioUrl,
+                    request.ApplicationNote
+                });
+
+                var history = new MentorApplicationHistory
+                {
+                    UserId = userId,
+                    Action = ApplicationAction.Submitted,
+                    ApplicationSnapshot = applicationSnapshot,
+                    CertificationUrls = request.CertificationUrls,
+                    SubmissionCount = submissionCount,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = userId
+                };
+                await _unitOfWork.MentorApplicationHistories.AddAsync(history);
+
+                // Create notification for admins
+                var notification = new Notification
+                {
+                    UserId = userId, // Will notify admins separately
+                    Type = NotificationType.System,
+                    Title = "New Mentor Application",
+                    Body = $"A new mentor application has been submitted and is awaiting review.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Notifications.AddAsync(notification);
+
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
+                return ServiceResult.SuccessResult("Mentor application submitted successfully. Please wait for admin review.");
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                throw;
+            }
+        }
+
+        public async Task<ServiceResult<MentorApplicationStatusDto>> GetApplicationStatusAsync(long userId)
+        {
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+
+            if (mentorProfile == null)
+            {
+                return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto
+                {
+                    HasApplied = false,
+                    Status = null,
+                    StatusText = "Not Applied"
+                });
+            }
+
+            var statusText = mentorProfile.ApprovalStatus switch
+            {
+                MentorApprovalStatus.Pending => "Pending Review",
+                MentorApprovalStatus.Approved => "Approved - Ready to Confirm",
+                MentorApprovalStatus.Rejected => "Rejected",
+                _ => "Unknown"
+            };
+
+            return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto
+            {
+                HasApplied = true,
+                Status = mentorProfile.ApprovalStatus,
+                StatusText = statusText,
+                AppliedAt = mentorProfile.CreatedAt,
+                ReviewedAt = mentorProfile.ReviewedAt,
+                RejectionReason = mentorProfile.RejectionReason,
+                Specialization = mentorProfile.Specialization,
+                ExperienceYears = mentorProfile.ExperienceYears
+            });
+        }
+
+        public async Task<ServiceResult> ConfirmSwitchToMentorAsync(long userId)
+        {
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            if (user.Role != UserRole.Student)
+                return ServiceResult.FailResult("Only students can confirm switch to mentor");
+
+            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+            if (mentorProfile == null)
+                return ServiceResult.NotFoundResult("No mentor application found");
+
+            if (mentorProfile.ApprovalStatus != MentorApprovalStatus.Approved)
+                return ServiceResult.FailResult("Your application has not been approved yet");
+
+            // Change user role to Mentor
+            user.Role = UserRole.Mentor;
+            user.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.Users.Update(user);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Congratulations! You are now a Mentor. Please log in again to access mentor features.");
+        }
+
+        #endregion
     }
 }

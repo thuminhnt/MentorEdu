@@ -9,13 +9,17 @@ using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace MentorEdu.Services.Implementations
 {
     public class AdminService : BaseService, IAdminService
     {
-        public AdminService(IUnitOfWork unitOfWork) : base(unitOfWork)
+        private readonly IEmailService _emailService;
+
+        public AdminService(IUnitOfWork unitOfWork, IEmailService emailService) : base(unitOfWork)
         {
+            _emailService = emailService;
         }
 
         #region Dashboard
@@ -1734,25 +1738,46 @@ namespace MentorEdu.Services.Implementations
             if (mentorProfile.ApprovalStatus == MentorApprovalStatus.Approved)
                 return ServiceResult.FailResult("This application has already been approved");
 
-            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            var user = await _unitOfWork.Users.GetByIdWithProfilesAsync(userId);
             if (user == null)
                 return ServiceResult.NotFoundResult("User not found");
+
+            // Get submission count
+            var submissionCount = await _unitOfWork.MentorApplicationHistories.GetSubmissionCountAsync(userId);
 
             await _unitOfWork.BeginTransactionAsync();
 
             try
             {
-                // Update mentor profile status
+                // Update mentor profile status (DO NOT change user role - user will confirm later)
                 mentorProfile.ApprovalStatus = MentorApprovalStatus.Approved;
                 mentorProfile.ReviewedAt = DateTime.UtcNow;
                 mentorProfile.ReviewedBy = adminId;
                 mentorProfile.UpdatedAt = DateTime.UtcNow;
                 _unitOfWork.MentorProfiles.Update(mentorProfile);
 
-                // Change user role from Student to Mentor
-                user.Role = UserRole.Mentor;
-                user.UpdatedAt = DateTime.UtcNow;
-                _unitOfWork.Users.Update(user);
+                // Record history for audit trail and ML training
+                var applicationSnapshot = JsonSerializer.Serialize(new
+                {
+                    mentorProfile.Specialization,
+                    mentorProfile.ExperienceYears,
+                    mentorProfile.Introduction,
+                    mentorProfile.PortfolioUrl,
+                    mentorProfile.ApplicationNote,
+                    mentorProfile.Title
+                });
+
+                var history = new MentorApplicationHistory
+                {
+                    UserId = userId,
+                    Action = ApplicationAction.Approved,
+                    ApplicationSnapshot = applicationSnapshot,
+                    CertificationUrls = mentorProfile.CertificationUrls,
+                    SubmissionCount = submissionCount > 0 ? submissionCount : 1,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = adminId
+                };
+                await _unitOfWork.MentorApplicationHistories.AddAsync(history);
 
                 // Create notification for user
                 var notification = new Notification
@@ -1760,7 +1785,7 @@ namespace MentorEdu.Services.Implementations
                     UserId = userId,
                     Type = NotificationType.System,
                     Title = "Mentor Application Approved",
-                    Body = "Congratulations! Your mentor application has been approved. You can now start accepting mentoring requests.",
+                    Body = "Congratulations! Your mentor application has been approved. Please go to your Profile to confirm switching to Mentor role.",
                     IsRead = false,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -1769,9 +1794,18 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.SaveChangesAsync();
                 await _unitOfWork.CommitTransactionAsync();
 
-                // TODO: Send email notification to user
+                // Send email notification to user
+                var fullName = user.UserProfile?.FullName ?? user.Email;
+                try
+                {
+                    await _emailService.SendMentorApprovalNotificationAsync(user.Email, fullName);
+                }
+                catch
+                {
+                    // Log but don't fail the approval if email fails
+                }
 
-                return ServiceResult.SuccessResult("Mentor application approved successfully");
+                return ServiceResult.SuccessResult("Mentor application approved successfully. User needs to confirm the role switch.");
             }
             catch
             {
@@ -1779,6 +1813,7 @@ namespace MentorEdu.Services.Implementations
                 throw;
             }
         }
+
 
         public async Task<ServiceResult> RejectMentorApplicationAsync(long userId, long adminId, string reason)
         {
@@ -1790,6 +1825,16 @@ namespace MentorEdu.Services.Implementations
             if (mentorProfile.ApprovalStatus != MentorApprovalStatus.Pending)
                 return ServiceResult.FailResult("Only pending applications can be rejected");
 
+            // Get user info with profile for email (using same method as ApproveMentorApplicationAsync)
+            var user = await _unitOfWork.Users.GetByIdWithProfilesAsync(userId);
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            var fullName = user.UserProfile?.FullName ?? user.Email.Split('@')[0];
+
+            // Get submission count
+            var submissionCount = await _unitOfWork.MentorApplicationHistories.GetSubmissionCountAsync(userId);
+
             // Update mentor profile status
             mentorProfile.ApprovalStatus = MentorApprovalStatus.Rejected;
             mentorProfile.ReviewedAt = DateTime.UtcNow;
@@ -1797,6 +1842,30 @@ namespace MentorEdu.Services.Implementations
             mentorProfile.RejectionReason = reason;
             mentorProfile.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.MentorProfiles.Update(mentorProfile);
+
+            // Record history for audit trail and ML training
+            var applicationSnapshot = JsonSerializer.Serialize(new
+            {
+                mentorProfile.Specialization,
+                mentorProfile.ExperienceYears,
+                mentorProfile.Introduction,
+                mentorProfile.PortfolioUrl,
+                mentorProfile.ApplicationNote,
+                mentorProfile.Title
+            });
+
+            var history = new MentorApplicationHistory
+            {
+                UserId = userId,
+                Action = ApplicationAction.Rejected,
+                ApplicationSnapshot = applicationSnapshot,
+                CertificationUrls = mentorProfile.CertificationUrls,
+                Reason = reason,
+                SubmissionCount = submissionCount > 0 ? submissionCount : 1,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = adminId
+            };
+            await _unitOfWork.MentorApplicationHistories.AddAsync(history);
 
             // Create notification for user
             var notification = new Notification
@@ -1812,9 +1881,165 @@ namespace MentorEdu.Services.Implementations
 
             await _unitOfWork.SaveChangesAsync();
 
-            // TODO: Send email notification to user
+            // Send email notification to user
+            try
+            {
+                await _emailService.SendMentorRejectionNotificationAsync(user.Email, fullName, reason);
+            }
+            catch (Exception)
+            {
+                // Log error but don't fail the operation
+                // Email sending failure shouldn't block the rejection
+            }
 
             return ServiceResult.SuccessResult("Mentor application rejected");
+        }
+
+        #endregion
+
+        #region Mentor Application History
+
+        public async Task<ServiceResult<PagedResponse<MentorApplicationHistoryDto>>> GetApplicationHistoryAsync(ApplicationHistoryQueryParams queryParams)
+        {
+            var historyItems = await _unitOfWork.MentorApplicationHistories.GetAllAsync();
+            var query = historyItems.AsQueryable();
+
+            // Apply filters
+            if (queryParams.UserId.HasValue)
+                query = query.Where(h => h.UserId == queryParams.UserId.Value);
+
+            if (queryParams.Action.HasValue)
+                query = query.Where(h => h.Action == queryParams.Action.Value);
+
+            if (queryParams.FromDate.HasValue)
+                query = query.Where(h => h.CreatedAt >= queryParams.FromDate.Value);
+
+            if (queryParams.ToDate.HasValue)
+                query = query.Where(h => h.CreatedAt <= queryParams.ToDate.Value);
+
+            var totalCount = query.Count();
+
+            var items = query
+                .OrderByDescending(h => h.CreatedAt)
+                .Skip((queryParams.PageNumber - 1) * queryParams.PageSize)
+                .Take(queryParams.PageSize)
+                .ToList();
+
+            // Get user information for each history item
+            var userIds = items.Select(h => h.UserId).Distinct().ToList();
+            var creatorIds = items.Where(h => h.CreatedBy.HasValue).Select(h => h.CreatedBy!.Value).Distinct().ToList();
+            var allUserIds = userIds.Union(creatorIds).ToList();
+
+            var users = new Dictionary<long, User>();
+            foreach (var uid in allUserIds)
+            {
+                var user = await _unitOfWork.Users.GetByIdWithProfilesAsync(uid);
+                if (user != null)
+                    users[uid] = user;
+            }
+
+            var dtoList = items.Select(h => new MentorApplicationHistoryDto
+            {
+                Id = h.Id,
+                UserId = h.UserId,
+                UserEmail = users.ContainsKey(h.UserId) ? users[h.UserId].Email : null,
+                UserFullName = users.ContainsKey(h.UserId) ? users[h.UserId].UserProfile?.FullName : null,
+                Action = h.Action,
+                ApplicationSnapshot = h.ApplicationSnapshot,
+                CertificationUrls = h.CertificationUrls,
+                Reason = h.Reason,
+                AiConfidenceScore = h.AiConfidenceScore,
+                AiModelVersion = h.AiModelVersion,
+                SubmissionCount = h.SubmissionCount,
+                CreatedAt = h.CreatedAt,
+                CreatedById = h.CreatedBy,
+                CreatedByEmail = h.CreatedBy.HasValue && users.ContainsKey(h.CreatedBy.Value) ? users[h.CreatedBy.Value].Email : null
+            }).ToList();
+
+            var pagedResponse = PagedResponse<MentorApplicationHistoryDto>.Create(
+                dtoList,
+                queryParams.PageNumber,
+                queryParams.PageSize,
+                totalCount
+            );
+
+            return ServiceResult<PagedResponse<MentorApplicationHistoryDto>>.SuccessResult(pagedResponse);
+        }
+
+        public async Task<ServiceResult<List<MentorApplicationHistoryDto>>> GetUserApplicationHistoryAsync(long userId)
+        {
+            var historyItems = await _unitOfWork.MentorApplicationHistories.GetByUserIdAsync(userId);
+
+            var user = await _unitOfWork.Users.GetByIdWithProfilesAsync(userId);
+            var creatorIds = historyItems.Where(h => h.CreatedBy.HasValue).Select(h => h.CreatedBy!.Value).Distinct().ToList();
+
+            var creators = new Dictionary<long, User>();
+            foreach (var cid in creatorIds)
+            {
+                var creator = await _unitOfWork.Users.GetByIdWithProfilesAsync(cid);
+                if (creator != null)
+                    creators[cid] = creator;
+            }
+
+            var dtoList = historyItems.Select(h => new MentorApplicationHistoryDto
+            {
+                Id = h.Id,
+                UserId = h.UserId,
+                UserEmail = user?.Email,
+                UserFullName = user?.UserProfile?.FullName,
+                Action = h.Action,
+                ApplicationSnapshot = h.ApplicationSnapshot,
+                CertificationUrls = h.CertificationUrls,
+                Reason = h.Reason,
+                AiConfidenceScore = h.AiConfidenceScore,
+                AiModelVersion = h.AiModelVersion,
+                SubmissionCount = h.SubmissionCount,
+                CreatedAt = h.CreatedAt,
+                CreatedById = h.CreatedBy,
+                CreatedByEmail = h.CreatedBy.HasValue && creators.ContainsKey(h.CreatedBy.Value) ? creators[h.CreatedBy.Value].Email : null
+            }).ToList();
+
+            return ServiceResult<List<MentorApplicationHistoryDto>>.SuccessResult(dtoList);
+        }
+
+        public async Task<ServiceResult<List<MentorApplicationHistoryExportDto>>> ExportApplicationHistoryForMLAsync(
+            DateTime? fromDate = null, 
+            DateTime? toDate = null, 
+            ApplicationAction? action = null)
+        {
+            var historyItems = await _unitOfWork.MentorApplicationHistories.GetAllAsync();
+            var query = historyItems.AsQueryable();
+
+            // Apply filters
+            if (fromDate.HasValue)
+                query = query.Where(h => h.CreatedAt >= fromDate.Value);
+
+            if (toDate.HasValue)
+                query = query.Where(h => h.CreatedAt <= toDate.Value);
+
+            if (action.HasValue)
+                query = query.Where(h => h.Action == action.Value);
+
+            // Only export reviewed applications (Approved or Rejected), not Submitted
+            query = query.Where(h => h.Action == ApplicationAction.Approved || h.Action == ApplicationAction.Rejected);
+
+            var exportList = query
+                .OrderBy(h => h.CreatedAt)
+                .Select(h => new MentorApplicationHistoryExportDto
+                {
+                    UserId = h.UserId,
+                    Action = (int)h.Action,
+                    ApplicationSnapshot = h.ApplicationSnapshot,
+                    CertificationUrls = h.CertificationUrls,
+                    Reason = h.Reason,
+                    SubmissionCount = h.SubmissionCount,
+                    CreatedAt = h.CreatedAt,
+                    IsManualReview = h.CreatedBy.HasValue,  // If CreatedBy is set, it was manual review
+                    AiConfidenceScore = h.AiConfidenceScore
+                })
+                .ToList();
+
+            return ServiceResult<List<MentorApplicationHistoryExportDto>>.SuccessResult(exportList);
         }
 
         #endregion

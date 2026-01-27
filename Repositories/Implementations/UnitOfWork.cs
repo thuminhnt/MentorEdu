@@ -32,6 +32,7 @@ namespace MentorEdu.Repositories.Implementations
         private ICommunityPostRepository? _communityPosts;
         private ICommunityCommentRepository? _communityComments;
         private INotificationRepository? _notifications;
+        private IMentorApplicationHistoryRepository? _mentorApplicationHistories;
 
         public UnitOfWork(ApplicationDbContext context)
         {
@@ -112,6 +113,10 @@ namespace MentorEdu.Repositories.Implementations
         // Notification
         public INotificationRepository Notifications => 
             _notifications ??= new NotificationRepository(_context);
+
+        // Mentor Application History
+        public IMentorApplicationHistoryRepository MentorApplicationHistories =>
+            _mentorApplicationHistories ??= new MentorApplicationHistoryRepository(_context);
 
         #region Transaction Management
 

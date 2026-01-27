@@ -18,5 +18,10 @@ namespace MentorEdu.Services.Interfaces
         // Reviews
         Task<ServiceResult<PagedResponse<MentorReviewDto>>> GetMentorReviewsAsync(long mentorId, int pageNumber, int pageSize);
         Task<ServiceResult<ReviewSummaryDto>> GetMentorReviewSummaryAsync(long mentorId);
+
+        // Mentor Application Flow
+        Task<ServiceResult> ApplyAsMentorAsync(long userId, ApplyAsMentorRequest request);
+        Task<ServiceResult<MentorApplicationStatusDto>> GetApplicationStatusAsync(long userId);
+        Task<ServiceResult> ConfirmSwitchToMentorAsync(long userId);
     }
 }
