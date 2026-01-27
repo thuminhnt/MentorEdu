@@ -556,6 +556,91 @@ namespace MentorEdu.Services.Implementations
 
         #endregion
 
+        #region Category-Hashtag Mapping
+
+        public async Task<ServiceResult<List<CategoryHashtagMappingDto>>> GetCategoryHashtagMappingsAsync()
+        {
+            var mappings = await _unitOfWork.CategoryHashtags.GetAllWithDetailsAsync();
+            
+            var grouped = mappings
+                .GroupBy(m => new { m.CategoryId, m.Category.Name })
+                .Select(g => new CategoryHashtagMappingDto
+                {
+                    CategoryId = g.Key.CategoryId,
+                    CategoryName = g.Key.Name,
+                    Hashtags = g.Select(m => new DTOs.Category.CategoryHashtagItemDto
+                    {
+                        Id = m.HashtagId,
+                        Name = m.Hashtag.Name
+                    }).ToList()
+                })
+                .ToList();
+
+            return ServiceResult<List<CategoryHashtagMappingDto>>.SuccessResult(grouped);
+        }
+
+        public async Task<ServiceResult<CategoryHashtagDetailDto>> GetHashtagsByCategoryAsync(long categoryId)
+        {
+            var category = await _unitOfWork.Categories.GetByIdAsync(categoryId);
+            if (category == null)
+                return ServiceResult<CategoryHashtagDetailDto>.NotFoundResult("Category not found");
+
+            var hashtags = await _unitOfWork.CategoryHashtags.GetHashtagsByCategoryIdAsync(categoryId);
+            
+            var dto = new CategoryHashtagDetailDto
+            {
+                CategoryId = category.Id,
+                CategoryName = category.Name,
+                Hashtags = hashtags.Select(h => new DTOs.Category.CategoryHashtagItemDto
+                {
+                    Id = h.Id,
+                    Name = h.Name
+                }).ToList()
+            };
+
+            return ServiceResult<CategoryHashtagDetailDto>.SuccessResult(dto);
+        }
+
+        public async Task<ServiceResult> AddCategoryHashtagMappingAsync(AddCategoryHashtagDto request)
+        {
+            var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
+            if (category == null)
+                return ServiceResult.NotFoundResult("Category not found");
+
+            var hashtag = await _unitOfWork.Hashtags.GetByIdAsync(request.HashtagId);
+            if (hashtag == null)
+                return ServiceResult.NotFoundResult("Hashtag not found");
+
+            var exists = await _unitOfWork.CategoryHashtags.ExistsAsync(request.CategoryId, request.HashtagId);
+            if (exists)
+                return ServiceResult.FailResult("This mapping already exists");
+
+            var mapping = new CategoryHashtag
+            {
+                CategoryId = request.CategoryId,
+                HashtagId = request.HashtagId
+            };
+
+            await _unitOfWork.CategoryHashtags.AddAsync(mapping);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Category-Hashtag mapping created successfully");
+        }
+
+        public async Task<ServiceResult> RemoveCategoryHashtagMappingAsync(RemoveCategoryHashtagDto request)
+        {
+            var exists = await _unitOfWork.CategoryHashtags.ExistsAsync(request.CategoryId, request.HashtagId);
+            if (!exists)
+                return ServiceResult.NotFoundResult("Mapping not found");
+
+            await _unitOfWork.CategoryHashtags.RemoveAsync(request.CategoryId, request.HashtagId);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Category-Hashtag mapping removed successfully");
+        }
+
+        #endregion
+
         #region Report Management
 
         public async Task<ServiceResult<PagedResponse<ReportDto>>> GetReportsAsync(int pageNumber, int pageSize, string? status = null)
@@ -1499,6 +1584,7 @@ namespace MentorEdu.Services.Implementations
 
             var hashtags = await query
                 .Include(h => h.MentorHashtags)
+                .Include(h => h.CategoryHashtags)
                 .OrderBy(h => h.Name)
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
@@ -1508,7 +1594,8 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = h.Id,
                 Name = h.Name,
-                UsageCount = h.MentorHashtags?.Count ?? 0
+                MentorCount = h.MentorHashtags?.Count ?? 0,
+                CategoryCount = h.CategoryHashtags?.Count ?? 0
             });
 
             var response = PagedResponse<AdminHashtagDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
@@ -1534,7 +1621,8 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = hashtag.Id,
                 Name = hashtag.Name,
-                UsageCount = 0
+                MentorCount = 0,
+                CategoryCount = 0
             };
 
             return ServiceResult<AdminHashtagDto>.CreatedResult(dto, "Hashtag created successfully");

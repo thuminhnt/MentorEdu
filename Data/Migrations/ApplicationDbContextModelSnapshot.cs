@@ -51,6 +51,23 @@ namespace MentorEdu.Data.Migrations
                     b.ToTable("categories", (string)null);
                 });
 
+            modelBuilder.Entity("MentorEdu.Models.CategoryHashtag", b =>
+                {
+                    b.Property<long>("CategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("category_id");
+
+                    b.Property<long>("HashtagId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("hashtag_id");
+
+                    b.HasKey("CategoryId", "HashtagId");
+
+                    b.HasIndex("HashtagId");
+
+                    b.ToTable("category_hashtags", (string)null);
+                });
+
             modelBuilder.Entity("MentorEdu.Models.CommunityComment", b =>
                 {
                     b.Property<long>("Id")
@@ -1369,6 +1386,25 @@ namespace MentorEdu.Data.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("MentorEdu.Models.CategoryHashtag", b =>
+                {
+                    b.HasOne("MentorEdu.Models.Category", "Category")
+                        .WithMany("CategoryHashtags")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MentorEdu.Models.Hashtag", "Hashtag")
+                        .WithMany("CategoryHashtags")
+                        .HasForeignKey("HashtagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Hashtag");
+                });
+
             modelBuilder.Entity("MentorEdu.Models.CommunityComment", b =>
                 {
                     b.HasOne("MentorEdu.Models.User", "Author")
@@ -1825,6 +1861,8 @@ namespace MentorEdu.Data.Migrations
 
             modelBuilder.Entity("MentorEdu.Models.Category", b =>
                 {
+                    b.Navigation("CategoryHashtags");
+
                     b.Navigation("Children");
 
                     b.Navigation("MentorCategories");
@@ -1844,6 +1882,8 @@ namespace MentorEdu.Data.Migrations
 
             modelBuilder.Entity("MentorEdu.Models.Hashtag", b =>
                 {
+                    b.Navigation("CategoryHashtags");
+
                     b.Navigation("MentorHashtags");
                 });
 

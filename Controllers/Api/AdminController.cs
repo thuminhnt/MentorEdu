@@ -264,6 +264,72 @@ namespace MentorEdu.Controllers.Api
 
         #endregion
 
+        #region Category-Hashtag Mapping
+
+        /// <summary>
+        /// Get all category-hashtag mappings
+        /// </summary>
+        [HttpGet("category-hashtags")]
+        public async Task<ActionResult<ApiResponse<List<CategoryHashtagMappingDto>>>> GetCategoryHashtagMappings()
+        {
+            var result = await _adminService.GetCategoryHashtagMappingsAsync();
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<List<CategoryHashtagMappingDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<List<CategoryHashtagMappingDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get hashtags mapped to a specific category
+        /// </summary>
+        [HttpGet("categories/{categoryId}/hashtags")]
+        public async Task<ActionResult<ApiResponse<CategoryHashtagDetailDto>>> GetHashtagsByCategory(long categoryId)
+        {
+            var result = await _adminService.GetHashtagsByCategoryAsync(categoryId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<CategoryHashtagDetailDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<CategoryHashtagDetailDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Add hashtag mapping to a category
+        /// </summary>
+        [HttpPost("category-hashtags")]
+        public async Task<ActionResult<ApiResponse>> AddCategoryHashtagMapping([FromBody] AddCategoryHashtagDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.FailResponse("Invalid request data"));
+
+            var result = await _adminService.AddCategoryHashtagMappingAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return StatusCode(201, ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// Remove hashtag mapping from a category
+        /// </summary>
+        [HttpDelete("category-hashtags")]
+        public async Task<ActionResult<ApiResponse>> RemoveCategoryHashtagMapping([FromBody] RemoveCategoryHashtagDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse.FailResponse("Invalid request data"));
+
+            var result = await _adminService.RemoveCategoryHashtagMappingAsync(request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        #endregion
+
         #region Report Management
 
         /// <summary>

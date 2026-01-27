@@ -22,6 +22,7 @@ namespace MentorEdu.Data
         public DbSet<Hashtag> Hashtags { get; set; }
         public DbSet<MentorCategory> MentorCategories { get; set; }
         public DbSet<MentorHashtag> MentorHashtags { get; set; }
+        public DbSet<CategoryHashtag> CategoryHashtags { get; set; }
 
         // Request, Proposal, Order
         public DbSet<Request> Requests { get; set; }
@@ -68,6 +69,7 @@ namespace MentorEdu.Data
             modelBuilder.Entity<Hashtag>().ToTable("hashtags");
             modelBuilder.Entity<MentorCategory>().ToTable("mentor_categories");
             modelBuilder.Entity<MentorHashtag>().ToTable("mentor_hashtags");
+            modelBuilder.Entity<CategoryHashtag>().ToTable("category_hashtags");
 
             modelBuilder.Entity<Request>().ToTable("requests");
             modelBuilder.Entity<Proposal>().ToTable("proposals");
@@ -214,6 +216,22 @@ namespace MentorEdu.Data
                 .HasOne(mh => mh.Hashtag)
                 .WithMany(h => h.MentorHashtags)
                 .HasForeignKey(mh => mh.HashtagId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // CategoryHashtag - Composite Key (Many-to-Many mapping)
+            modelBuilder.Entity<CategoryHashtag>()
+                .HasKey(ch => new { ch.CategoryId, ch.HashtagId });
+
+            modelBuilder.Entity<CategoryHashtag>()
+                .HasOne(ch => ch.Category)
+                .WithMany(c => c.CategoryHashtags)
+                .HasForeignKey(ch => ch.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CategoryHashtag>()
+                .HasOne(ch => ch.Hashtag)
+                .WithMany(h => h.CategoryHashtags)
+                .HasForeignKey(ch => ch.HashtagId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Hashtag - Unique Name

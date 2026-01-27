@@ -33,6 +33,13 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult> DeleteCategoryAsync(long categoryId);
         #endregion
 
+        #region Category-Hashtag Mapping
+        Task<ServiceResult<List<CategoryHashtagMappingDto>>> GetCategoryHashtagMappingsAsync();
+        Task<ServiceResult<CategoryHashtagDetailDto>> GetHashtagsByCategoryAsync(long categoryId);
+        Task<ServiceResult> AddCategoryHashtagMappingAsync(AddCategoryHashtagDto request);
+        Task<ServiceResult> RemoveCategoryHashtagMappingAsync(RemoveCategoryHashtagDto request);
+        #endregion
+
         #region Report Management
         Task<ServiceResult<PagedResponse<ReportDto>>> GetReportsAsync(int pageNumber, int pageSize, string? status = null);
         Task<ServiceResult<ReportDetailDto>> GetReportDetailAsync(long reportId);

@@ -10,8 +10,11 @@ namespace MentorEdu.Services.Implementations
 {
     public class CommunityService : BaseService, ICommunityService
     {
-        public CommunityService(IUnitOfWork unitOfWork) : base(unitOfWork)
+        private readonly INotificationService _notificationService;
+
+        public CommunityService(IUnitOfWork unitOfWork, INotificationService notificationService) : base(unitOfWork)
         {
+            _notificationService = notificationService;
         }
 
         #region Posts
@@ -55,6 +58,12 @@ namespace MentorEdu.Services.Implementations
 
             await _unitOfWork.CommunityPosts.AddAsync(post);
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify mentors about relevant post based on hashtags
+            if (request.Tags != null && request.Tags.Count > 0)
+            {
+                await _notificationService.NotifyMentorsAboutRelevantPostAsync(post.Id, request.Tags);
+            }
 
             return await GetPostByIdAsync(post.Id);
         }
