@@ -1,7 +1,7 @@
 namespace MentorEdu.Repositories.Interfaces
 {
     /// <summary>
-    /// Unit of Work Interface - Qu?n lý transactions và các repositories
+    /// Unit of Work Interface - Qu?n lï¿½ transactions vï¿½ cï¿½c repositories
     /// </summary>
     public interface IUnitOfWork : IDisposable
     {
@@ -13,6 +13,7 @@ namespace MentorEdu.Repositories.Interfaces
         // Category & Hashtag
         ICategoryRepository Categories { get; }
         IHashtagRepository Hashtags { get; }
+        ICategoryHashtagRepository CategoryHashtags { get; }
 
         // Request, Proposal, Order
         IRequestRepository Requests { get; }

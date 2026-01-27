@@ -374,7 +374,8 @@ namespace MentorEdu.DTOs.Admin
     {
         public long Id { get; set; }
         public string Name { get; set; } = string.Empty;
-        public int UsageCount { get; set; }
+        public int MentorCount { get; set; }
+        public int CategoryCount { get; set; }
     }
 
     /// <summary>

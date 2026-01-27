@@ -8,5 +8,10 @@ namespace MentorEdu.Repositories.Interfaces
         Task<MentorProfile?> GetByUserIdWithDetailsAsync(long userId);
         Task<IEnumerable<MentorProfile>> GetTopRatedMentorsAsync(int count);
         Task<IEnumerable<MentorProfile>> GetMentorsByCategoryAsync(long categoryId);
+        
+        /// <summary>
+        /// Get mentor user IDs who have the specified category as specialization.
+        /// </summary>
+        Task<IEnumerable<long>> GetMentorIdsByCategoryIdAsync(long categoryId);
     }
 }
