@@ -57,32 +57,29 @@ namespace MentorEdu.Services.Implementations
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'Google Sans', Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #ffffff; margin: 0; padding: 0; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }}
         .email-wrapper {{ width: 100%; padding: 40px 20px; }}
         .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; }}
-        .logo-section {{ display: flex; align-items: center; justify-content: center; gap: 14px; padding: 48px 40px 32px; }}
-        .logo-section img {{ height: 40px; width: 40px; object-fit: contain; }}
-        .logo-text {{ font-size: 28px; font-weight: 500; color: #1a73e8; letter-spacing: -0.5px; }}
-        .content {{ padding: 0 40px 40px; }}
-        .greeting {{ color: #202124; font-size: 24px; font-weight: 400; margin: 0 0 24px 0; }}
-        .text {{ color: #5f6368; font-size: 14px; line-height: 1.6; margin: 0 0 32px 0; }}
-        .button-container {{ text-align: center; margin: 0 0 32px 0; }}
-        .button {{ display: inline-block; background: #ffffff; color: #1a73e8 !important; padding: 12px 24px; text-decoration: none; border: 2px solid #1a73e8; border-radius: 4px; font-weight: 500; font-size: 14px; transition: background-color 0.2s; }}
-        .button:hover {{ background-color: #f1f5f9; }}
-        .note {{ background: #fef7e0; padding: 16px; border-radius: 4px; border-left: 4px solid #f9ab00; margin: 0 0 32px 0; }}
+        .header {{ padding: 32px 40px 24px; text-align: center; border-bottom: 1px solid #e8eaed; }}
+        .logo-text {{ font-size: 24px; font-weight: 500; color: #1a73e8; }}
+        .content {{ padding: 32px 40px; }}
+        .greeting {{ color: #202124; font-size: 20px; font-weight: 400; margin: 0 0 16px 0; }}
+        .text {{ color: #5f6368; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }}
+        .button-container {{ text-align: center; margin: 24px 0; }}
+        .button {{ display: inline-block; background: #1a73e8; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 14px; }}
+        .note {{ background: #f8f9fa; padding: 16px; border-radius: 4px; margin: 16px 0; }}
         .note-text {{ color: #5f6368; font-size: 13px; margin: 0; line-height: 1.5; }}
-        .link-section {{ padding-top: 24px; border-top: 1px solid #e8eaed; }}
+        .link-section {{ padding-top: 16px; border-top: 1px solid #e8eaed; }}
         .link-label {{ color: #5f6368; font-size: 12px; margin: 0 0 8px 0; }}
-        .link {{ color: #1a73e8; font-size: 12px; word-break: break-all; text-decoration: none; }}
-        .footer {{ padding: 24px 40px; text-align: center; border-top: 1px solid #e8eaed; }}
+        .link {{ color: #1a73e8; font-size: 12px; word-break: break-all; }}
+        .footer {{ padding: 24px 40px; text-align: center; border-top: 1px solid #e8eaed; background: #f8f9fa; }}
         .footer-text {{ color: #80868b; font-size: 12px; margin: 0; }}
     </style>
 </head>
 <body>
     <div class=""email-wrapper"">
         <div class=""container"">
-            <div class=""logo-section"">
-                <img src=""https://i.imgur.com/6QZ6g7U.png"" alt=""EduMentor Logo"">
+            <div class=""header"">
                 <span class=""logo-text"">EduMentor</span>
             </div>
             <div class=""content"">
@@ -126,32 +123,29 @@ namespace MentorEdu.Services.Implementations
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: 'Google Sans', Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #ffffff; margin: 0; padding: 0; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }}
         .email-wrapper {{ width: 100%; padding: 40px 20px; }}
         .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; }}
-        .logo-section {{ display: flex; align-items: center; justify-content: center; gap: 14px; padding: 48px 40px 32px; }}
-        .logo-section img {{ height: 40px; width: 40px; object-fit: contain; }}
-        .logo-text {{ font-size: 28px; font-weight: 500; color: #1a73e8; letter-spacing: -0.5px; }}
-        .content {{ padding: 0 40px 40px; }}
-        .greeting {{ color: #202124; font-size: 24px; font-weight: 400; margin: 0 0 24px 0; }}
-        .text {{ color: #5f6368; font-size: 14px; line-height: 1.6; margin: 0 0 32px 0; }}
-        .button-container {{ text-align: center; margin: 0 0 32px 0; }}
-        .button {{ display: inline-block; background: #ffffff; color: #1a73e8 !important; padding: 12px 24px; text-decoration: none; border: 2px solid #1a73e8; border-radius: 4px; font-weight: 500; font-size: 14px; transition: background-color 0.2s; }}
-        .button:hover {{ background-color: #f1f5f9; }}
-        .note {{ background: #fef7e0; padding: 16px; border-radius: 4px; border-left: 4px solid #f9ab00; margin: 0 0 32px 0; }}
+        .header {{ padding: 32px 40px 24px; text-align: center; border-bottom: 1px solid #e8eaed; }}
+        .logo-text {{ font-size: 24px; font-weight: 500; color: #1a73e8; }}
+        .content {{ padding: 32px 40px; }}
+        .greeting {{ color: #202124; font-size: 20px; font-weight: 400; margin: 0 0 16px 0; }}
+        .text {{ color: #5f6368; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }}
+        .button-container {{ text-align: center; margin: 24px 0; }}
+        .button {{ display: inline-block; background: #1a73e8; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 14px; }}
+        .note {{ background: #f8f9fa; padding: 16px; border-radius: 4px; margin: 16px 0; }}
         .note-text {{ color: #5f6368; font-size: 13px; margin: 0; line-height: 1.5; }}
-        .link-section {{ padding-top: 24px; border-top: 1px solid #e8eaed; }}
+        .link-section {{ padding-top: 16px; border-top: 1px solid #e8eaed; }}
         .link-label {{ color: #5f6368; font-size: 12px; margin: 0 0 8px 0; }}
-        .link {{ color: #1a73e8; font-size: 12px; word-break: break-all; text-decoration: none; }}
-        .footer {{ padding: 24px 40px; text-align: center; border-top: 1px solid #e8eaed; }}
+        .link {{ color: #1a73e8; font-size: 12px; word-break: break-all; }}
+        .footer {{ padding: 24px 40px; text-align: center; border-top: 1px solid #e8eaed; background: #f8f9fa; }}
         .footer-text {{ color: #80868b; font-size: 12px; margin: 0; }}
     </style>
 </head>
 <body>
     <div class=""email-wrapper"">
         <div class=""container"">
-            <div class=""logo-section"">
-                <img src=""https://i.imgur.com/6QZ6g7U.png"" alt=""EduMentor Logo"">
+            <div class=""header"">
                 <span class=""logo-text"">EduMentor</span>
             </div>
             <div class=""content"">
@@ -170,6 +164,132 @@ namespace MentorEdu.Services.Implementations
                     <p class=""link-label"">If the button doesn't work, copy and paste this link:</p>
                     <p><a href=""{resetUrl}"" class=""link"">{resetUrl}</a></p>
                 </div>
+            </div>
+            <div class=""footer"">
+                <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>";
+
+            await SendEmailAsync(toEmail, subject, htmlBody);
+        }
+
+        public async Task SendMentorApprovalNotificationAsync(string toEmail, string fullName)
+        {
+            var loginUrl = $"{_emailSettings.FrontendBaseUrl}/login";
+
+            var subject = "Congratulations! Your Mentor Application is Approved";
+            var htmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }}
+        .email-wrapper {{ width: 100%; padding: 40px 20px; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; }}
+        .header {{ padding: 32px 40px 24px; text-align: center; border-bottom: 1px solid #e8eaed; }}
+        .logo-text {{ font-size: 24px; font-weight: 500; color: #1a73e8; }}
+        .content {{ padding: 32px 40px; }}
+        .greeting {{ color: #202124; font-size: 20px; font-weight: 400; margin: 0 0 16px 0; }}
+        .text {{ color: #5f6368; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }}
+        .button-container {{ text-align: center; margin: 24px 0; }}
+        .button {{ display: inline-block; background: #1a73e8; color: #ffffff !important; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 14px; }}
+        .note {{ background: #f8f9fa; padding: 16px; border-radius: 4px; margin: 16px 0; }}
+        .note-text {{ color: #5f6368; font-size: 13px; margin: 0; line-height: 1.5; }}
+        .footer {{ padding: 24px 40px; text-align: center; border-top: 1px solid #e8eaed; background: #f8f9fa; }}
+        .footer-text {{ color: #80868b; font-size: 12px; margin: 0; }}
+    </style>
+</head>
+<body>
+    <div class=""email-wrapper"">
+        <div class=""container"">
+            <div class=""header"">
+                <span class=""logo-text"">EduMentor</span>
+            </div>
+            <div class=""content"">
+                <p class=""greeting"">Congratulations {fullName}! 🎉</p>
+                <p class=""text"">Your mentor application has been approved!</p>
+                
+                <div class=""note"">
+                    <p class=""note-text"">You are now ready to start your mentoring journey and share your knowledge with the student community.</p>
+                </div>
+                
+                <p class=""text"">To complete the process, please log in to the system and confirm the role transition on your Profile page.</p>
+                
+                <div class=""button-container"">
+                    <a href=""{loginUrl}"" class=""button"">Log In Now</a>
+                </div>
+                
+                <p class=""text"">As a Mentor, you can:</p>
+                <ul style=""color: #5f6368; font-size: 14px; margin: 0 0 16px 20px; line-height: 1.8;"">
+                    <li>Receive mentoring requests from students</li>
+                    <li>Create proposals and manage orders</li>
+                    <li>Earn income by sharing your knowledge</li>
+                    <li>Build your reputation and personal brand</li>
+                </ul>
+            </div>
+            <div class=""footer"">
+                <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>";
+
+            await SendEmailAsync(toEmail, subject, htmlBody);
+        }
+
+        public async Task SendMentorRejectionNotificationAsync(string toEmail, string fullName, string reason)
+        {
+            var subject = "Update on Your Mentor Application - EduMentor";
+            var htmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: 'Google Sans', Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }}
+        .email-wrapper {{ width: 100%; padding: 40px 20px; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e8eaed; border-radius: 8px; overflow: hidden; }}
+        .header {{ padding: 32px 40px 24px; text-align: center; border-bottom: 1px solid #e8eaed; }}
+        .logo-text {{ font-size: 24px; font-weight: 500; color: #1a73e8; letter-spacing: -0.5px; }}
+        .content {{ padding: 32px 40px; }}
+        .greeting {{ color: #202124; font-size: 20px; font-weight: 400; margin: 0 0 16px 0; }}
+        .text {{ color: #5f6368; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }}
+        .reason-box {{ background: #fafafa; padding: 16px; border-radius: 4px; border: 1px solid #e8eaed; margin: 16px 0; }}
+        .reason-label {{ color: #5f6368; font-size: 12px; font-weight: 600; text-transform: uppercase; margin: 0 0 8px 0; letter-spacing: 0.5px; }}
+        .reason-text {{ color: #202124; font-size: 14px; margin: 0; line-height: 1.5; }}
+        .footer {{ padding: 24px 40px; text-align: center; border-top: 1px solid #e8eaed; background: #f8f9fa; }}
+        .footer-text {{ color: #80868b; font-size: 12px; margin: 0; }}
+    </style>
+</head>
+<body>
+    <div class=""email-wrapper"">
+        <div class=""container"">
+            <div class=""header"">
+                <span class=""logo-text"">EduMentor</span>
+            </div>
+            <div class=""content"">
+                <p class=""greeting"">Hello {fullName},</p>
+                <p class=""text"">Thank you for your interest in becoming a Mentor at EduMentor. After carefully reviewing your application, we regret to inform you that your application has not been approved at this time.</p>
+                
+                <div class=""reason-box"">
+                    <p class=""reason-label"">Reason</p>
+                    <p class=""reason-text"">{reason}</p>
+                </div>
+                
+                <p class=""text"">You are welcome to update your profile information and reapply in the future.</p>
+                
+                <p class=""text"">If you have any questions, please feel free to contact us at support@edumentor.com.</p>
+                
+                <p class=""text"">Best regards,<br>The EduMentor Team</p>
             </div>
             <div class=""footer"">
                 <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>

@@ -55,6 +55,9 @@ namespace MentorEdu.Data
         // Verification Tokens
         public DbSet<VerificationToken> VerificationTokens { get; set; }
 
+        // Mentor Application History (for audit trail and ML training)
+        public DbSet<MentorApplicationHistory> MentorApplicationHistories { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -93,6 +96,7 @@ namespace MentorEdu.Data
             modelBuilder.Entity<CommunityPost>().ToTable("community_posts");
             modelBuilder.Entity<CommunityComment>().ToTable("community_comments");
             modelBuilder.Entity<VerificationToken>().ToTable("verification_tokens");
+            modelBuilder.Entity<MentorApplicationHistory>().ToTable("mentor_application_history");
 
             // User - Unique Email
             modelBuilder.Entity<User>()
@@ -160,6 +164,36 @@ namespace MentorEdu.Data
             modelBuilder.Entity<Notification>()
                 .Property(n => n.Data)
                 .HasColumnType("nvarchar(max)");
+
+            // MentorApplicationHistory configuration
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .Property(h => h.ApplicationSnapshot)
+                .HasColumnType("nvarchar(max)");
+
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .Property(h => h.AiConfidenceScore)
+                .HasColumnType("decimal(5,2)");
+
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .HasOne(h => h.User)
+                .WithMany()
+                .HasForeignKey(h => h.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .HasOne(h => h.ActionPerformedBy)
+                .WithMany()
+                .HasForeignKey(h => h.CreatedBy)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .HasIndex(h => h.UserId);
+
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .HasIndex(h => h.Action);
+
+            modelBuilder.Entity<MentorApplicationHistory>()
+                .HasIndex(h => h.CreatedAt);
 
             // UserProfile - One-to-One with User
             modelBuilder.Entity<UserProfile>()

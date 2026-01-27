@@ -45,6 +45,9 @@ namespace MentorEdu.Repositories.Interfaces
         // Notification
         INotificationRepository Notifications { get; }
 
+        // Mentor Application History
+        IMentorApplicationHistoryRepository MentorApplicationHistories { get; }
+
         // Transaction Management
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();

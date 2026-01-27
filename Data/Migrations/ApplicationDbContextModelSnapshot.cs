@@ -247,6 +247,69 @@ namespace MentorEdu.Data.Migrations
                     b.ToTable("hashtags", (string)null);
                 });
 
+            modelBuilder.Entity("MentorEdu.Models.MentorApplicationHistory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Action")
+                        .HasColumnType("int")
+                        .HasColumnName("action");
+
+                    b.Property<decimal?>("AiConfidenceScore")
+                        .HasColumnType("decimal(5,2)")
+                        .HasColumnName("ai_confidence_score");
+
+                    b.Property<string>("AiModelVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("ai_model_version");
+
+                    b.Property<string>("ApplicationSnapshot")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("application_snapshot");
+
+                    b.Property<string>("CertificationUrls")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("certification_urls");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("CreatedBy")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("reason");
+
+                    b.Property<int>("SubmissionCount")
+                        .HasColumnType("int")
+                        .HasColumnName("submission_count");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("mentor_application_history", (string)null);
+                });
+
             modelBuilder.Entity("MentorEdu.Models.MentorCategory", b =>
                 {
                     b.Property<long>("MentorId")
@@ -1475,6 +1538,24 @@ namespace MentorEdu.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.MentorApplicationHistory", b =>
+                {
+                    b.HasOne("MentorEdu.Models.User", "ActionPerformedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("MentorEdu.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActionPerformedBy");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MentorEdu.Models.MentorCategory", b =>

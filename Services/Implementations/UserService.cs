@@ -252,16 +252,16 @@ namespace MentorEdu.Services.Implementations
 
             // Check if already a mentor
             if (user.Role == UserRole.Mentor)
-                return ServiceResult.FailResult("Bạn đã là Mentor rồi");
+                return ServiceResult.FailResult("You are already a Mentor");
 
             // Check if already has pending application
             var existingProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
             if (existingProfile != null)
             {
                 if (existingProfile.ApprovalStatus == MentorApprovalStatus.Pending)
-                    return ServiceResult.FailResult("Bạn đã có đơn đăng ký đang chờ duyệt");
+                    return ServiceResult.FailResult("You already have a pending application");
                 if (existingProfile.ApprovalStatus == MentorApprovalStatus.Approved)
-                    return ServiceResult.FailResult("Đơn đăng ký của bạn đã được duyệt");
+                    return ServiceResult.FailResult("Your application has been approved");
             }
 
             // Create or update mentor profile
@@ -289,7 +289,7 @@ namespace MentorEdu.Services.Implementations
 
             await _unitOfWork.SaveChangesAsync();
 
-            return ServiceResult.SuccessResult("Đơn đăng ký mentor đã được gửi. Vui lòng chờ admin phê duyệt.");
+            return ServiceResult.SuccessResult("Mentor application has been submitted. Please wait for admin approval.");
         }
 
         public async Task<ServiceResult<MentorApplicationStatusDto>> GetMentorApplicationStatusAsync(long userId)
@@ -306,7 +306,7 @@ namespace MentorEdu.Services.Implementations
                 {
                     HasApplied = true,
                     Status = MentorApprovalStatus.Approved,
-                    StatusText = "Bạn đã là Mentor"
+                    StatusText = "You are already a Mentor"
                 });
             }
 
@@ -317,16 +317,16 @@ namespace MentorEdu.Services.Implementations
                 return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto
                 {
                     HasApplied = false,
-                    StatusText = "Bạn chưa đăng ký làm Mentor"
+                    StatusText = "You have not applied to become a Mentor"
                 });
             }
 
             var statusText = mentorProfile.ApprovalStatus switch
             {
-                MentorApprovalStatus.Pending => "Đơn đăng ký đang chờ duyệt",
-                MentorApprovalStatus.Approved => "Đơn đăng ký đã được duyệt",
-                MentorApprovalStatus.Rejected => $"Đơn đăng ký bị từ chối: {mentorProfile.RejectionReason}",
-                _ => "Không xác định"
+                MentorApprovalStatus.Pending => "Application is pending review",
+                MentorApprovalStatus.Approved => "Application has been approved",
+                MentorApprovalStatus.Rejected => $"Application rejected: {mentorProfile.RejectionReason}",
+                _ => "Unknown status"
             };
 
             return ServiceResult<MentorApplicationStatusDto>.SuccessResult(new MentorApplicationStatusDto

@@ -101,6 +101,12 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult> ApproveMentorApplicationAsync(long userId, long adminId);
         Task<ServiceResult> RejectMentorApplicationAsync(long userId, long adminId, string reason);
         #endregion
+
+        #region Mentor Application History
+        Task<ServiceResult<PagedResponse<MentorApplicationHistoryDto>>> GetApplicationHistoryAsync(ApplicationHistoryQueryParams queryParams);
+        Task<ServiceResult<List<MentorApplicationHistoryDto>>> GetUserApplicationHistoryAsync(long userId);
+        Task<ServiceResult<List<MentorApplicationHistoryExportDto>>> ExportApplicationHistoryForMLAsync(DateTime? fromDate = null, DateTime? toDate = null, ApplicationAction? action = null);
+        #endregion
     }
 
     public class AdminDashboardDto

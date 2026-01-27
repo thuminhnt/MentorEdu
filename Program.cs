@@ -109,6 +109,14 @@ if (!string.IsNullOrWhiteSpace(googleClientId) &&
             context.Response.Redirect(uri);
             return Task.CompletedTask;
         };
+
+        // Handle when user cancels or denies Google login
+        options.Events.OnRemoteFailure = context =>
+        {
+            context.Response.Redirect("/api/Auth/google-callback?error=access_denied");
+            context.HandleResponse();
+            return Task.CompletedTask;
+        };
     });
 }
 

@@ -812,6 +812,71 @@ namespace MentorEdu.Controllers.Api
 
         #endregion
 
+        #region Mentor Application History
+
+        /// <summary>
+        /// Get application history with filters (for audit trail)
+        /// </summary>
+        [HttpGet("mentor-applications/history")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<MentorApplicationHistoryDto>>>> GetApplicationHistory(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] long? userId = null,
+            [FromQuery] ApplicationAction? action = null,
+            [FromQuery] DateTime? fromDate = null,
+            [FromQuery] DateTime? toDate = null)
+        {
+            var queryParams = new ApplicationHistoryQueryParams
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                UserId = userId,
+                Action = action,
+                FromDate = fromDate,
+                ToDate = toDate
+            };
+
+            var result = await _adminService.GetApplicationHistoryAsync(queryParams);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<MentorApplicationHistoryDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<MentorApplicationHistoryDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get application history for a specific user
+        /// </summary>
+        [HttpGet("mentor-applications/{userId}/history")]
+        public async Task<ActionResult<ApiResponse<List<MentorApplicationHistoryDto>>>> GetUserApplicationHistory(long userId)
+        {
+            var result = await _adminService.GetUserApplicationHistoryAsync(userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<List<MentorApplicationHistoryDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<List<MentorApplicationHistoryDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Export application history for ML training (JSON format)
+        /// </summary>
+        [HttpGet("mentor-applications/history/export")]
+        public async Task<ActionResult<ApiResponse<List<MentorApplicationHistoryExportDto>>>> ExportApplicationHistoryForML(
+            [FromQuery] DateTime? fromDate = null,
+            [FromQuery] DateTime? toDate = null,
+            [FromQuery] ApplicationAction? action = null)
+        {
+            var result = await _adminService.ExportApplicationHistoryForMLAsync(fromDate, toDate, action);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<List<MentorApplicationHistoryExportDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<List<MentorApplicationHistoryExportDto>>.SuccessResponse(result.Data!));
+        }
+
+        #endregion
+
         #region Helper Methods
 
         private long GetCurrentUserId()

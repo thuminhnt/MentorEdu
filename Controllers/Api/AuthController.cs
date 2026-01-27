@@ -57,7 +57,7 @@ namespace MentorEdu.Controllers.Api
                 return Ok(ApiResponse<LoginResponse>.SuccessResponse(result.Data!, result.Message));
 
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(
                     StatusCodes.Status500InternalServerError,
@@ -205,15 +205,38 @@ namespace MentorEdu.Controllers.Api
         [HttpGet("google-callback")]
         public async Task<IActionResult> GoogleCallback()
         {
-            var authenticateResult = await HttpContext.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
+            // Check if user cancelled the login BEFORE authenticating
+            var error = HttpContext.Request.Query["error"].ToString();
+            if (!string.IsNullOrEmpty(error))
+            {
+                // User cancelled or denied access - redirect without authenticating
+                var redirectPage = "login"; // Default to login page
+                
+                if (error == "access_denied")
+                {
+                    return Redirect($"http://localhost:5173/{redirectPage}?cancelled=true");
+                }
+                return Redirect($"http://localhost:5173/{redirectPage}?error={Uri.EscapeDataString(error)}");
+            }
 
-            if (!authenticateResult.Succeeded)
+            // Try to authenticate - wrap in try-catch to handle any authentication failures
+            AuthenticateResult authenticateResult2;
+            try
+            {
+                authenticateResult2 = await HttpContext.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
+            }
+            catch (Exception)
+            {
+                return Redirect("http://localhost:5173/login?error=Authentication%20failed");
+            }
+
+            if (!authenticateResult2.Succeeded)
             {
                 // Redirect to frontend with error
                 return Redirect("http://localhost:5173/login?error=Authentication%20failed");
             }
 
-            var claims = authenticateResult.Principal?.Identities.FirstOrDefault()?.Claims;
+            var claims = authenticateResult2.Principal?.Identities.FirstOrDefault()?.Claims;
             var email = claims?.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
             var name = claims?.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? "";
             var avatarUrl = claims?.FirstOrDefault(c => c.Type == "picture")?.Value;
@@ -225,14 +248,14 @@ namespace MentorEdu.Controllers.Api
 
             // Get role from state if provided
             UserRole? role = null;
-            if (authenticateResult.Properties?.Items.TryGetValue("role", out var roleStr) == true 
+            if (authenticateResult2.Properties?.Items.TryGetValue("role", out var roleStr) == true 
                 && int.TryParse(roleStr, out var roleInt))
             {
                 role = (UserRole)roleInt;
             }
 
             // Get mode from state
-            var mode = authenticateResult.Properties?.Items.TryGetValue("mode", out var modeStr) == true ? modeStr : null;
+            var mode = authenticateResult2.Properties?.Items.TryGetValue("mode", out var modeStr) == true ? modeStr : null;
             var isRegisterRequest = mode == "register";
 
             var result = await _authService.GoogleLoginAsync(email, name, avatarUrl, role, isRegisterRequest);

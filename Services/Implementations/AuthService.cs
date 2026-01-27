@@ -469,7 +469,7 @@ namespace MentorEdu.Services.Implementations
             
             if (user != null && isRegisterRequest)
             {
-                return ServiceResult<LoginResponse>.FailResult("Email này đã được đăng ký. Vui lòng đăng nhập.", 400);
+                return ServiceResult<LoginResponse>.FailResult("This email is already registered. Please sign in.", 400);
             }
 
             if (user == null)
@@ -528,7 +528,7 @@ namespace MentorEdu.Services.Implementations
             }
             else if (!user.IsActive)
             {
-                return ServiceResult<LoginResponse>.FailResult("Tài khoản đã bị khóa", 403);
+                return ServiceResult<LoginResponse>.FailResult("Account has been locked", 403);
             }
 
             // Get user profile for full name and avatar
@@ -559,7 +559,7 @@ namespace MentorEdu.Services.Implementations
                 MentorStatus = mentorStatus
             };
 
-            return ServiceResult<LoginResponse>.SuccessResult(response, "Đăng nhập Google thành công");
+            return ServiceResult<LoginResponse>.SuccessResult(response, "Google login successful");
         }
 
         #endregion
