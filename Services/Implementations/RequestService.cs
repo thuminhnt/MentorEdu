@@ -226,7 +226,7 @@ namespace MentorEdu.Services.Implementations
                 Proposals = request.Proposals?.Select(p => new ProposalListDto
                 {
                     Id = p.Id,
-                    RequestId = p.RequestId,
+                    RequestId = p.RequestId ?? 0,
                     Price = p.Price,
                     EstimatedHours = p.EstimatedHours,
                     Message = p.Message,

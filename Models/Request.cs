@@ -14,6 +14,7 @@ namespace MentorEdu.Models
         [Column("student_id")]
         public long StudentId { get; set; }
 
+
         [MaxLength(255)]
         [Column("title")]
         public string? Title { get; set; }

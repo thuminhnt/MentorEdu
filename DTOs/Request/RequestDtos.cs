@@ -25,6 +25,7 @@ namespace MentorEdu.DTOs.Request
         public long StudentId { get; set; }
         public string? StudentName { get; set; }
         public string? StudentAvatar { get; set; }
+
     }
 
     /// <summary>
@@ -56,7 +57,7 @@ namespace MentorEdu.DTOs.Request
     /// Create Request DTO
     /// </summary>
     public class CreateRequestDto
-    {
+    {        public long? MentorId { get; set; }
         [Required(ErrorMessage = "Title is required")]
         [MaxLength(255)]
         public string Title { get; set; } = string.Empty;

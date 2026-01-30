@@ -12,7 +12,10 @@ namespace MentorEdu.Models
         public long Id { get; set; }
 
         [Column("request_id")]
-        public long RequestId { get; set; }
+        public long? RequestId { get; set; }
+
+        [Column("post_id")]
+        public long? PostId { get; set; }
 
         [Column("mentor_id")]
         public long MentorId { get; set; }
@@ -37,7 +40,10 @@ namespace MentorEdu.Models
 
         // Navigation Properties
         [ForeignKey("RequestId")]
-        public virtual Request Request { get; set; } = null!;
+        public virtual Request? Request { get; set; }
+
+        [ForeignKey("PostId")]
+        public virtual CommunityPost? Post { get; set; }
 
         [ForeignKey("MentorId")]
         public virtual User Mentor { get; set; } = null!;

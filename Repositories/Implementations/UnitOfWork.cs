@@ -16,6 +16,8 @@ namespace MentorEdu.Repositories.Implementations
         private ICategoryRepository? _categories;
         private IHashtagRepository? _hashtags;
         private ICategoryHashtagRepository? _categoryHashtags;
+        private IMentorCategoryRepository? _mentorCategories;
+        private IMentorHashtagRepository? _mentorHashtags;
         private IRequestRepository? _requests;
         private IProposalRepository? _proposals;
         private IOrderRepository? _orders;
@@ -31,6 +33,9 @@ namespace MentorEdu.Repositories.Implementations
         private IReportRepository? _reports;
         private ICommunityPostRepository? _communityPosts;
         private ICommunityCommentRepository? _communityComments;
+        private ICommunityPostHashtagRepository? _communityPostHashtags;
+        private ICommunityPostFileRepository? _communityPostFiles;
+        private IUserFollowRepository? _userFollows;
         private INotificationRepository? _notifications;
         private IMentorApplicationHistoryRepository? _mentorApplicationHistories;
 
@@ -58,6 +63,12 @@ namespace MentorEdu.Repositories.Implementations
 
         public ICategoryHashtagRepository CategoryHashtags => 
             _categoryHashtags ??= new CategoryHashtagRepository(_context);
+
+        public IMentorCategoryRepository MentorCategories => 
+            _mentorCategories ??= new MentorCategoryRepository(_context);
+
+        public IMentorHashtagRepository MentorHashtags => 
+            _mentorHashtags ??= new MentorHashtagRepository(_context);
 
         // Request, Proposal, Order
         public IRequestRepository Requests => 
@@ -110,6 +121,16 @@ namespace MentorEdu.Repositories.Implementations
         public ICommunityCommentRepository CommunityComments => 
             _communityComments ??= new CommunityCommentRepository(_context);
 
+        public ICommunityPostHashtagRepository CommunityPostHashtags => 
+            _communityPostHashtags ??= new CommunityPostHashtagRepository(_context);
+
+        public ICommunityPostFileRepository CommunityPostFiles => 
+            _communityPostFiles ??= new CommunityPostFileRepository(_context);
+
+        // Follow
+        public IUserFollowRepository UserFollows => 
+            _userFollows ??= new UserFollowRepository(_context);
+
         // Notification
         public INotificationRepository Notifications => 
             _notifications ??= new NotificationRepository(_context);
@@ -148,6 +169,45 @@ namespace MentorEdu.Repositories.Implementations
                 await _transaction.DisposeAsync();
                 _transaction = null;
             }
+        }
+
+        /// <summary>
+        /// Execute operation with execution strategy for retry-on-failure support
+        /// This wraps the entire transaction in the execution strategy
+        /// </summary>
+        public async Task ExecuteWithStrategyAsync(Func<Task> operation)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(
+                state: operation,
+                operation: async (context, state, ct) =>
+                {
+                    await using var transaction = await context.Database.BeginTransactionAsync(ct);
+                    await state();
+                    await transaction.CommitAsync(ct);
+                    return true;
+                },
+                verifySucceeded: null,
+                cancellationToken: CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Execute operation with execution strategy and return result
+        /// </summary>
+        public async Task<T> ExecuteWithStrategyAsync<T>(Func<Task<T>> operation)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(
+                state: operation,
+                operation: async (context, state, ct) =>
+                {
+                    await using var transaction = await context.Database.BeginTransactionAsync(ct);
+                    var result = await state();
+                    await transaction.CommitAsync(ct);
+                    return result;
+                },
+                verifySucceeded: null,
+                cancellationToken: CancellationToken.None);
         }
 
         #endregion
