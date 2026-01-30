@@ -176,7 +176,7 @@ builder.Services.AddScoped<ICommunityPostRepository, CommunityPostRepository>();
 builder.Services.AddScoped<ICommunityCommentRepository, CommunityCommentRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
-
+builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
 // =======================
 // UNIT OF WORK
 // =======================
