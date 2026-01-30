@@ -52,5 +52,7 @@ namespace MentorEdu.Models
         public virtual ICollection<CommunityComment> CommunityComments { get; set; } = new List<CommunityComment>();
         public virtual ICollection<MentorCategory> MentorCategories { get; set; } = new List<MentorCategory>();
         public virtual ICollection<MentorHashtag> MentorHashtags { get; set; } = new List<MentorHashtag>();
+        public virtual ICollection<UserFollow> Followers { get; set; } = new List<UserFollow>();
+        public virtual ICollection<UserFollow> Following { get; set; } = new List<UserFollow>();
     }
 }

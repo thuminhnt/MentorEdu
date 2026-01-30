@@ -152,19 +152,22 @@ namespace MentorEdu.Services.Implementations
                 _unitOfWork.Proposals.Update(proposal);
 
                 // Reject other proposals for this request
-                var otherProposals = await _unitOfWork.Proposals.GetByRequestIdAsync(proposal.RequestId);
-                foreach (var other in otherProposals.Where(p => p.Id != proposalId && p.Status == ProposalStatus.Pending))
+                if (proposal.RequestId.HasValue)
                 {
-                    other.Status = ProposalStatus.Rejected;
-                    other.UpdatedAt = DateTime.UtcNow;
-                    _unitOfWork.Proposals.Update(other);
-                }
+                    var otherProposals = await _unitOfWork.Proposals.GetByRequestIdAsync(proposal.RequestId.Value);
+                    foreach (var other in otherProposals.Where(p => p.Id != proposalId && p.Status == ProposalStatus.Pending))
+                    {
+                        other.Status = ProposalStatus.Rejected;
+                        other.UpdatedAt = DateTime.UtcNow;
+                        _unitOfWork.Proposals.Update(other);
+                    }
 
-                // Update request status
-                var request = proposal.Request!;
-                request.Status = RequestStatus.InOrder;
-                request.UpdatedAt = DateTime.UtcNow;
-                _unitOfWork.Requests.Update(request);
+                    // Update request status
+                    var request = proposal.Request!;
+                    request.Status = RequestStatus.InOrder;
+                    request.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.Requests.Update(request);
+                }
 
                 // Create order
                 var order = new Order
@@ -252,7 +255,7 @@ namespace MentorEdu.Services.Implementations
             return new ProposalListDto
             {
                 Id = proposal.Id,
-                RequestId = proposal.RequestId,
+                RequestId = proposal.RequestId ?? 0,
                 Price = proposal.Price,
                 EstimatedHours = proposal.EstimatedHours,
                 Message = proposal.Message,
@@ -272,7 +275,7 @@ namespace MentorEdu.Services.Implementations
             return new ProposalDetailDto
             {
                 Id = proposal.Id,
-                RequestId = proposal.RequestId,
+                RequestId = proposal.RequestId ?? 0,
                 RequestTitle = proposal.Request?.Title,
                 Price = proposal.Price,
                 EstimatedHours = proposal.EstimatedHours,

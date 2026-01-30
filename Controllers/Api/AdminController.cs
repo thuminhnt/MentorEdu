@@ -270,6 +270,7 @@ namespace MentorEdu.Controllers.Api
         /// Get all category-hashtag mappings
         /// </summary>
         [HttpGet("category-hashtags")]
+        [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<List<CategoryHashtagMappingDto>>>> GetCategoryHashtagMappings()
         {
             var result = await _adminService.GetCategoryHashtagMappingsAsync();
@@ -701,6 +702,7 @@ namespace MentorEdu.Controllers.Api
         /// Get all hashtags with filters
         /// </summary>
         [HttpGet("hashtags")]
+        [AllowAnonymous]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminHashtagDto>>>> GetAllHashtags([FromQuery] AdminSearchHashtagDto request)
         {
             var result = await _adminService.GetAllHashtagsAsync(request);

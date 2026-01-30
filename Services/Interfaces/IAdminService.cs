@@ -91,6 +91,7 @@ namespace MentorEdu.Services.Interfaces
 
         #region Hashtags Management
         Task<ServiceResult<PagedResponse<AdminHashtagDto>>> GetAllHashtagsAsync(AdminSearchHashtagDto request);
+        Task<ServiceResult<List<HashtagDto>>> GetHashtagsAsync(); // For public autocomplete
         Task<ServiceResult<AdminHashtagDto>> CreateHashtagAsync(CreateHashtagDto request);
         Task<ServiceResult> DeleteHashtagAsync(long hashtagId);
         #endregion

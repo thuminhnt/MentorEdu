@@ -83,6 +83,16 @@ namespace MentorEdu.Services.Common
                 StatusCode = 400
             };
         }
+
+        public static ServiceResult<T> BadRequestResult(string message = "Bad request")
+        {
+            return new ServiceResult<T>
+            {
+                Success = false,
+                Message = message,
+                StatusCode = 400
+            };
+        }
     }
 
     /// <summary>
@@ -142,6 +152,16 @@ namespace MentorEdu.Services.Common
                 Success = false,
                 Message = message,
                 StatusCode = 403
+            };
+        }
+
+        public static ServiceResult BadRequestResult(string message = "Bad request")
+        {
+            return new ServiceResult
+            {
+                Success = false,
+                Message = message,
+                StatusCode = 400
             };
         }
     }

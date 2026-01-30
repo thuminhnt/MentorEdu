@@ -890,7 +890,7 @@ namespace MentorEdu.Services.Implementations
             var dtos = proposals.Select(p => new AdminProposalListDto
             {
                 Id = p.Id,
-                RequestId = p.RequestId,
+                RequestId = p.RequestId ?? 0,
                 RequestTitle = p.Request?.Title,
                 Price = p.Price,
                 EstimatedHours = p.EstimatedHours,
@@ -1606,6 +1606,21 @@ namespace MentorEdu.Services.Implementations
             return ServiceResult<PagedResponse<AdminHashtagDto>>.SuccessResult(response);
         }
 
+        public async Task<ServiceResult<List<HashtagDto>>> GetHashtagsAsync()
+        {
+            var hashtags = await _unitOfWork.Hashtags.Query()
+                .OrderBy(h => h.Name)
+                .ToListAsync();
+
+            var dtos = hashtags.Select(h => new HashtagDto
+            {
+                Id = h.Id,
+                Name = h.Name
+            }).ToList();
+
+            return ServiceResult<List<HashtagDto>>.SuccessResult(dtos);
+        }
+
         public async Task<ServiceResult<AdminHashtagDto>> CreateHashtagAsync(CreateHashtagDto request)
         {
             // Check if exists
@@ -1667,6 +1682,8 @@ namespace MentorEdu.Services.Implementations
 
             var applications = await query
                 .Include(mp => mp.User).ThenInclude(u => u.UserProfile)
+                .Include(mp => mp.User).ThenInclude(u => u.MentorCategories).ThenInclude(mc => mc.Category)
+                .Include(mp => mp.User).ThenInclude(u => u.MentorHashtags).ThenInclude(mh => mh.Hashtag)
                 .Include(mp => mp.Reviewer).ThenInclude(r => r!.UserProfile)
                 .OrderByDescending(mp => mp.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
@@ -1685,6 +1702,16 @@ namespace MentorEdu.Services.Implementations
                 PortfolioUrl = mp.PortfolioUrl,
                 CertificationUrls = mp.CertificationUrls,
                 ApplicationNote = mp.ApplicationNote,
+                Categories = mp.User?.MentorCategories?.Select(mc => new CategorySimpleDto
+                {
+                    Id = mc.CategoryId,
+                    Name = mc.Category?.Name ?? ""
+                }).ToList() ?? new List<CategorySimpleDto>(),
+                Hashtags = mp.User?.MentorHashtags?.Select(mh => new HashtagSimpleDto
+                {
+                    Id = mh.HashtagId,
+                    Name = mh.Hashtag?.Name ?? ""
+                }).ToList() ?? new List<HashtagSimpleDto>(),
                 ApprovalStatus = mp.ApprovalStatus,
                 CreatedAt = mp.CreatedAt,
                 ReviewedAt = mp.ReviewedAt,
@@ -1700,6 +1727,8 @@ namespace MentorEdu.Services.Implementations
         {
             var mentorProfile = await _unitOfWork.MentorProfiles.Query()
                 .Include(mp => mp.User).ThenInclude(u => u.UserProfile)
+                .Include(mp => mp.User).ThenInclude(u => u.MentorCategories).ThenInclude(mc => mc.Category)
+                .Include(mp => mp.User).ThenInclude(u => u.MentorHashtags).ThenInclude(mh => mh.Hashtag)
                 .Include(mp => mp.Reviewer).ThenInclude(r => r!.UserProfile)
                 .FirstOrDefaultAsync(mp => mp.UserId == userId);
 
@@ -1718,6 +1747,16 @@ namespace MentorEdu.Services.Implementations
                 PortfolioUrl = mentorProfile.PortfolioUrl,
                 CertificationUrls = mentorProfile.CertificationUrls,
                 ApplicationNote = mentorProfile.ApplicationNote,
+                Categories = mentorProfile.User?.MentorCategories?.Select(mc => new CategorySimpleDto
+                {
+                    Id = mc.CategoryId,
+                    Name = mc.Category?.Name ?? ""
+                }).ToList() ?? new List<CategorySimpleDto>(),
+                Hashtags = mentorProfile.User?.MentorHashtags?.Select(mh => new HashtagSimpleDto
+                {
+                    Id = mh.HashtagId,
+                    Name = mh.Hashtag?.Name ?? ""
+                }).ToList() ?? new List<HashtagSimpleDto>(),
                 ApprovalStatus = mentorProfile.ApprovalStatus,
                 CreatedAt = mentorProfile.CreatedAt,
                 ReviewedAt = mentorProfile.ReviewedAt,

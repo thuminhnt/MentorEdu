@@ -1,6 +1,7 @@
 using MentorEdu.DTOs.Category;
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Hashtag;
+using MentorEdu.DTOs.User;
 using MentorEdu.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -43,6 +44,44 @@ namespace MentorEdu.Controllers.Api
                 return StatusCode(result.StatusCode, ApiResponse<CategoryResponseDto>.FailResponse(result.Message ?? ""));
 
             return Ok(ApiResponse<CategoryResponseDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get hashtags by category ID (public)
+        /// </summary>
+        [HttpGet("{categoryId}/hashtags")]
+        public async Task<ActionResult<ApiResponse<CategoryHashtagDetailDto>>> GetHashtagsByCategory(long categoryId)
+        {
+            var result = await _adminService.GetHashtagsByCategoryAsync(categoryId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<CategoryHashtagDetailDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<CategoryHashtagDetailDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Search hashtags (public) - for autocomplete
+        /// </summary>
+        [HttpGet("/api/hashtags")]
+        public async Task<ActionResult<ApiResponse<List<HashtagDto>>>> SearchHashtags([FromQuery] string? keyword = null)
+        {
+            var result = await _adminService.GetHashtagsAsync();
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<List<HashtagDto>>.FailResponse(result.Message ?? ""));
+
+            var hashtags = result.Data ?? new List<HashtagDto>();
+            
+            // Filter by keyword if provided
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                hashtags = hashtags
+                    .Where(h => h.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            return Ok(ApiResponse<List<HashtagDto>>.SuccessResponse(hashtags));
         }
     }
 }

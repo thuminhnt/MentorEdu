@@ -144,6 +144,80 @@ namespace MentorEdu.Controllers.Api
                 return StatusCode(500, ApiResponse<UploadResult>.FailResponse($"Upload failed: {ex.Message}"));
             }
         }
+
+        /// <summary>
+        /// Upload files for community post (max 10MB, 2 files)
+        /// </summary>
+        [HttpPost("upload/community-post")]
+        [Authorize]
+        [RequestSizeLimit(30 * 1024 * 1024)] // 30MB total limit
+        public async Task<ActionResult<ApiResponse<UploadResult>>> UploadCommunityPostFiles([FromForm] List<IFormFile> files)
+        {
+            if (files == null || files.Count == 0)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("No files provided"));
+
+            if (files.Count > 2)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("Maximum 2 files allowed per post"));
+
+            var uploadedUrls = new List<string>();
+            var errors = new List<string>();
+            var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".gif", ".webp" };
+
+            foreach (var file in files)
+            {
+                // Validate file size (10MB max per file)
+                if (file.Length > 10 * 1024 * 1024)
+                {
+                    errors.Add($"{file.FileName}: File size exceeds 10MB limit");
+                    continue;
+                }
+
+                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(extension))
+                {
+                    errors.Add($"{file.FileName}: Invalid file type. Allowed: {string.Join(", ", allowedExtensions)}");
+                    continue;
+                }
+
+                try
+                {
+                    var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "posts");
+                    if (!Directory.Exists(uploadPath))
+                        Directory.CreateDirectory(uploadPath);
+
+                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                    var filePath = Path.Combine(uploadPath, uniqueFileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    var fileUrl = $"/uploads/posts/{uniqueFileName}";
+                    uploadedUrls.Add(fileUrl);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{file.FileName}: Upload failed - {ex.Message}");
+                }
+            }
+
+            if (uploadedUrls.Count == 0)
+            {
+                return BadRequest(ApiResponse<UploadResult>.FailResponse(
+                    $"No files were uploaded. Errors: {string.Join("; ", errors)}"
+                ));
+            }
+
+            var result = new UploadResult
+            {
+                FileUrls = uploadedUrls,
+                Errors = errors.Count > 0 ? errors : null
+            };
+
+            return Ok(ApiResponse<UploadResult>.SuccessResponse(result, 
+                $"{uploadedUrls.Count} file(s) uploaded successfully"));
+        }
     }
 
     public class UploadResult

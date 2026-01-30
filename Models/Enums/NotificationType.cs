@@ -6,11 +6,15 @@ namespace MentorEdu.Models.Enums
         RequestCreated,
         RequestAssigned,
         ProposalCreated,
+        NewProposal,
         ProposalAccepted,
+        ProposalRejected,
         OrderStarted,
         OrderCompleted,
         OrderDisputed,
         WalletTransaction,
-        RelevantPost  // New: notify mentor about relevant community posts
+        RelevantPost,
+        NewComment,
+        NewFollower
     }
 }

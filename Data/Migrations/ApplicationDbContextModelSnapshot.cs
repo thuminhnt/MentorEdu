@@ -115,6 +115,10 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("author_id");
 
+                    b.Property<long?>("CategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("category_id");
+
                     b.Property<string>("Content")
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("content");
@@ -136,7 +140,71 @@ namespace MentorEdu.Data.Migrations
 
                     b.HasIndex("AuthorId");
 
+                    b.HasIndex("CategoryId");
+
                     b.ToTable("community_posts", (string)null);
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.CommunityPostFile", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FileName")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<long?>("FileSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("file_size");
+
+                    b.Property<string>("FileType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("file_type");
+
+                    b.Property<string>("FileUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("file_url");
+
+                    b.Property<long>("PostId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("post_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PostId");
+
+                    b.ToTable("community_post_files", (string)null);
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.CommunityPostHashtag", b =>
+                {
+                    b.Property<long>("PostId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("post_id");
+
+                    b.Property<long>("HashtagId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("hashtag_id");
+
+                    b.HasKey("PostId", "HashtagId");
+
+                    b.HasIndex("HashtagId");
+
+                    b.ToTable("community_post_hashtags", (string)null);
                 });
 
             modelBuilder.Entity("MentorEdu.Models.Conversation", b =>
@@ -712,11 +780,15 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("message");
 
+                    b.Property<long?>("PostId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("post_id");
+
                     b.Property<decimal?>("Price")
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("price");
 
-                    b.Property<long>("RequestId")
+                    b.Property<long?>("RequestId")
                         .HasColumnType("bigint")
                         .HasColumnName("request_id");
 
@@ -733,6 +805,8 @@ namespace MentorEdu.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("MentorId");
+
+                    b.HasIndex("PostId");
 
                     b.HasIndex("RequestId");
 
@@ -1030,6 +1104,37 @@ namespace MentorEdu.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.UserFollow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("FollowerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("follower_id");
+
+                    b.Property<long>("FollowingId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("following_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FollowingId");
+
+                    b.HasIndex("FollowerId", "FollowingId")
+                        .IsUnique();
+
+                    b.ToTable("user_follows", (string)null);
                 });
 
             modelBuilder.Entity("MentorEdu.Models.UserProfile", b =>
@@ -1495,7 +1600,44 @@ namespace MentorEdu.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MentorEdu.Models.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Author");
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.CommunityPostFile", b =>
+                {
+                    b.HasOne("MentorEdu.Models.CommunityPost", "Post")
+                        .WithMany("Files")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.CommunityPostHashtag", b =>
+                {
+                    b.HasOne("MentorEdu.Models.Hashtag", "Hashtag")
+                        .WithMany("CommunityPostHashtags")
+                        .HasForeignKey("HashtagId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MentorEdu.Models.CommunityPost", "Post")
+                        .WithMany("PostHashtags")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Hashtag");
+
+                    b.Navigation("Post");
                 });
 
             modelBuilder.Entity("MentorEdu.Models.Conversation", b =>
@@ -1713,13 +1855,19 @@ namespace MentorEdu.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MentorEdu.Models.CommunityPost", "Post")
+                        .WithMany("Proposals")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("MentorEdu.Models.Request", "Request")
                         .WithMany("Proposals")
                         .HasForeignKey("RequestId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Mentor");
+
+                    b.Navigation("Post");
 
                     b.Navigation("Request");
                 });
@@ -1827,6 +1975,25 @@ namespace MentorEdu.Data.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Wallet");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.UserFollow", b =>
+                {
+                    b.HasOne("MentorEdu.Models.User", "Follower")
+                        .WithMany("Following")
+                        .HasForeignKey("FollowerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MentorEdu.Models.User", "Following")
+                        .WithMany("Followers")
+                        .HasForeignKey("FollowingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Follower");
+
+                    b.Navigation("Following");
                 });
 
             modelBuilder.Entity("MentorEdu.Models.UserProfile", b =>
@@ -1954,6 +2121,12 @@ namespace MentorEdu.Data.Migrations
             modelBuilder.Entity("MentorEdu.Models.CommunityPost", b =>
                 {
                     b.Navigation("Comments");
+
+                    b.Navigation("Files");
+
+                    b.Navigation("PostHashtags");
+
+                    b.Navigation("Proposals");
                 });
 
             modelBuilder.Entity("MentorEdu.Models.Conversation", b =>
@@ -1964,6 +2137,8 @@ namespace MentorEdu.Data.Migrations
             modelBuilder.Entity("MentorEdu.Models.Hashtag", b =>
                 {
                     b.Navigation("CategoryHashtags");
+
+                    b.Navigation("CommunityPostHashtags");
 
                     b.Navigation("MentorHashtags");
                 });
@@ -2009,6 +2184,10 @@ namespace MentorEdu.Data.Migrations
                     b.Navigation("CommunityComments");
 
                     b.Navigation("CommunityPosts");
+
+                    b.Navigation("Followers");
+
+                    b.Navigation("Following");
 
                     b.Navigation("MentorCategories");
 

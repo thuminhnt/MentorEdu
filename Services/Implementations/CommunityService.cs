@@ -5,6 +5,7 @@ using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace MentorEdu.Services.Implementations
 {
@@ -19,12 +20,47 @@ namespace MentorEdu.Services.Implementations
 
         #region Posts
 
-        public async Task<ServiceResult<PagedResponse<CommunityPostListDto>>> GetPostsAsync(SearchPostDto searchDto)
-        {
-            var (posts, totalCount) = await _unitOfWork.CommunityPosts.GetPagedAsync(
-                searchDto.PageNumber, searchDto.PageSize, searchDto.Keyword);
 
-            var dtos = posts.Select(MapToPostListDto);
+        public async Task<ServiceResult<PagedResponse<CommunityPostListDto>>> GetPostsAsync(SearchPostDto searchDto, long? currentUserId = null)
+        {
+            // Build query with filters
+            var query = _unitOfWork.CommunityPosts.Query()
+                .Include(p => p.Author).ThenInclude(a => a.UserProfile)
+                .Include(p => p.Category)
+                .Include(p => p.PostHashtags).ThenInclude(ph => ph.Hashtag)
+                .Include(p => p.Files)
+                .Include(p => p.Comments)
+                .Include(p => p.Proposals)
+                .AsQueryable();
+
+            // Keyword filter
+            if (!string.IsNullOrWhiteSpace(searchDto.Keyword))
+            {
+                query = query.Where(p => p.Title!.Contains(searchDto.Keyword) || 
+                                          p.Content!.Contains(searchDto.Keyword));
+            }
+
+            // Hashtag filter
+            if (!string.IsNullOrWhiteSpace(searchDto.Hashtag))
+            {
+                query = query.Where(p => p.PostHashtags.Any(ph => ph.Hashtag!.Name == searchDto.Hashtag));
+            }
+
+            // Category filter
+            if (searchDto.CategoryId.HasValue)
+            {
+                query = query.Where(p => p.CategoryId == searchDto.CategoryId);
+            }
+
+            var totalCount = await query.CountAsync();
+
+            var posts = await query
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+                .Take(searchDto.PageSize)
+                .ToListAsync();
+
+            var dtos = posts.Select(p => MapToPostListDto(p, currentUserId));
             var response = PagedResponse<CommunityPostListDto>.Create(dtos, searchDto.PageNumber, searchDto.PageSize, totalCount);
 
             return ServiceResult<PagedResponse<CommunityPostListDto>>.SuccessResult(response);
@@ -52,6 +88,7 @@ namespace MentorEdu.Services.Implementations
                 AuthorId = userId,
                 Title = request.Title,
                 Content = request.Content,
+                CategoryId = request.CategoryId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -59,10 +96,66 @@ namespace MentorEdu.Services.Implementations
             await _unitOfWork.CommunityPosts.AddAsync(post);
             await _unitOfWork.SaveChangesAsync();
 
-            // Notify mentors about relevant post based on hashtags
-            if (request.Tags != null && request.Tags.Count > 0)
+            // Handle hashtags - create or lookup existing
+            if (request.Hashtags != null && request.Hashtags.Count > 0)
             {
-                await _notificationService.NotifyMentorsAboutRelevantPostAsync(post.Id, request.Tags);
+                foreach (var tagName in request.Hashtags.Take(10)) // Limit to 10 hashtags
+                {
+                    var normalizedName = tagName.Trim().ToLower().TrimStart('#');
+                    if (string.IsNullOrEmpty(normalizedName)) continue;
+
+                    // Try to find existing hashtag
+                    var hashtag = await _unitOfWork.Hashtags.GetByNameAsync(normalizedName);
+                    
+                    if (hashtag == null)
+                    {
+                        // Create new hashtag
+                        hashtag = new Hashtag { Name = normalizedName };
+                        await _unitOfWork.Hashtags.AddAsync(hashtag);
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+
+                    // Create post-hashtag link
+                    var postHashtag = new CommunityPostHashtag
+                    {
+                        PostId = post.Id,
+                        HashtagId = hashtag.Id
+                    };
+                    await _unitOfWork.CommunityPostHashtags.AddAsync(postHashtag);
+                }
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            // Handle file attachments
+            if (request.FileUrls != null && request.FileUrls.Count > 0)
+            {
+                foreach (var fileUrl in request.FileUrls.Take(2)) // Limit to 2 files
+                {
+                    if (string.IsNullOrEmpty(fileUrl)) continue;
+
+                    var fileName = Path.GetFileName(fileUrl);
+                    var extension = Path.GetExtension(fileUrl).ToLower();
+                    var fileType = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" }.Contains(extension) 
+                        ? "image" 
+                        : "document";
+
+                    var postFile = new CommunityPostFile
+                    {
+                        PostId = post.Id,
+                        FileUrl = fileUrl,
+                        FileName = fileName,
+                        FileType = fileType,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.CommunityPostFiles.AddAsync(postFile);
+                }
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            // Notify mentors about relevant post based on hashtags
+            if (request.Hashtags != null && request.Hashtags.Count > 0)
+            {
+                await _notificationService.NotifyMentorsAboutRelevantPostAsync(post.Id, request.Hashtags);
             }
 
             return await GetPostByIdAsync(post.Id);
@@ -133,6 +226,18 @@ namespace MentorEdu.Services.Implementations
             await _unitOfWork.CommunityComments.AddAsync(comment);
             await _unitOfWork.SaveChangesAsync();
 
+            // Notify post author about new comment (if not commenting on own post)
+            if (post.AuthorId != userId)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    post.AuthorId,
+                    NotificationType.NewComment,
+                    "New Comment on Your Post",
+                    $"{user.UserProfile?.FullName ?? "Someone"} commented on your post",
+                    $"{{\"postId\": {post.Id}, \"commentId\": {comment.Id}}}"
+                );
+            }
+
             var dto = new CommunityCommentDto
             {
                 Id = comment.Id,
@@ -188,10 +293,10 @@ namespace MentorEdu.Services.Implementations
 
         #region Featured
 
-        public async Task<ServiceResult<List<CommunityPostListDto>>> GetRecentPostsAsync(int count = 10)
+        public async Task<ServiceResult<List<CommunityPostListDto>>> GetRecentPostsAsync(int count = 10, long? currentUserId = null)
         {
             var posts = await _unitOfWork.CommunityPosts.GetRecentPostsAsync(count);
-            var dtos = posts.Select(MapToPostListDto).ToList();
+            var dtos = posts.Select(p => MapToPostListDto(p, currentUserId)).ToList();
 
             return ServiceResult<List<CommunityPostListDto>>.SuccessResult(dtos);
         }
@@ -204,17 +309,279 @@ namespace MentorEdu.Services.Implementations
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize);
 
-            var dtos = pagedPosts.Select(MapToPostListDto).ToList();
+            var dtos = pagedPosts.Select(p => MapToPostListDto(p, userId)).ToList();
 
             return ServiceResult<List<CommunityPostListDto>>.SuccessResult(dtos);
         }
 
         #endregion
 
+        #region Following Posts
+
+        public async Task<ServiceResult<PagedResponse<CommunityPostListDto>>> GetFollowingPostsAsync(long userId, int pageNumber, int pageSize)
+        {
+            var followingIds = await _unitOfWork.UserFollows.GetFollowingIdsAsync(userId);
+            
+            if (!followingIds.Any())
+            {
+                var emptyResponse = PagedResponse<CommunityPostListDto>.Create(
+                    Enumerable.Empty<CommunityPostListDto>(), pageNumber, pageSize, 0);
+                return ServiceResult<PagedResponse<CommunityPostListDto>>.SuccessResult(emptyResponse);
+            }
+
+            var (posts, totalCount) = await _unitOfWork.CommunityPosts.GetPagedAsync(
+                pageNumber, pageSize, null, followingIds.ToList());
+
+            var dtos = posts.Select(p => MapToPostListDto(p, userId));
+            var response = PagedResponse<CommunityPostListDto>.Create(dtos, pageNumber, pageSize, totalCount);
+
+            return ServiceResult<PagedResponse<CommunityPostListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult<List<TrendingHashtagDto>>> GetTrendingHashtagsAsync(int count = 10)
+        {
+            // Get hashtags with their post counts
+            var hashtagPostCounts = await _unitOfWork.CommunityPostHashtags.Query()
+                .GroupBy(cph => new { cph.HashtagId, cph.Hashtag!.Name })
+                .Select(g => new TrendingHashtagDto
+                {
+                    Id = g.Key.HashtagId,
+                    Name = g.Key.Name ?? "",
+                    PostCount = g.Count()
+                })
+                .OrderByDescending(h => h.PostCount)
+                .Take(count)
+                .ToListAsync();
+
+            return ServiceResult<List<TrendingHashtagDto>>.SuccessResult(hashtagPostCounts);
+        }
+
+        #endregion
+
+        #region Proposals
+
+        public async Task<ServiceResult<CommunityProposalDto>> SendProposalAsync(long mentorId, long postId, SendProposalDto request)
+        {
+            var mentor = await _unitOfWork.Users.GetByIdWithProfilesAsync(mentorId);
+            if (mentor == null || mentor.Role != UserRole.Mentor)
+                return ServiceResult<CommunityProposalDto>.ForbiddenResult("Only mentors can send proposals");
+
+            var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postId);
+            if (post == null)
+                return ServiceResult<CommunityProposalDto>.NotFoundResult("Post not found");
+
+            if (post.AuthorId == mentorId)
+                return ServiceResult<CommunityProposalDto>.BadRequestResult("You cannot send a proposal to your own post");
+
+            // Check if already sent proposal
+            var existingProposal = await _unitOfWork.Proposals.GetByPostAndMentorAsync(postId, mentorId);
+            if (existingProposal != null)
+                return ServiceResult<CommunityProposalDto>.BadRequestResult("You have already sent a proposal for this post");
+
+            var proposal = new Proposal
+            {
+                PostId = postId,
+                MentorId = mentorId,
+                Price = request.Price,
+                EstimatedHours = request.EstimatedHours,
+                Message = request.Message,
+                Status = ProposalStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Proposals.AddAsync(proposal);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Notify post author
+            await _notificationService.CreateNotificationAsync(
+                post.AuthorId,
+                NotificationType.NewProposal,
+                "New Proposal Received",
+                $"{mentor.UserProfile?.FullName ?? "A mentor"} sent you a proposal for your post",
+                $"{{\"proposalId\": {proposal.Id}, \"postId\": {postId}}}"
+            );
+
+            var dto = MapToProposalDto(proposal, post, mentor);
+            return ServiceResult<CommunityProposalDto>.CreatedResult(dto, "Proposal sent successfully");
+        }
+
+        public async Task<ServiceResult<List<CommunityProposalDto>>> GetProposalsByPostAsync(long postId)
+        {
+            var proposals = await _unitOfWork.Proposals.GetByPostIdAsync(postId);
+            var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postId);
+
+            var dtos = proposals.Select(p => MapToProposalDto(p, post, p.Mentor)).ToList();
+            return ServiceResult<List<CommunityProposalDto>>.SuccessResult(dtos);
+        }
+
+        public async Task<ServiceResult<AcceptProposalResultDto>> AcceptProposalAsync(long userId, long proposalId)
+        {
+            var proposal = await _unitOfWork.Proposals.GetByIdWithDetailsAsync(proposalId);
+            if (proposal == null)
+                return ServiceResult<AcceptProposalResultDto>.NotFoundResult("Proposal not found");
+
+            if (proposal.Post == null)
+                return ServiceResult<AcceptProposalResultDto>.BadRequestResult("Proposal is not linked to a post");
+
+            if (proposal.Post.AuthorId != userId)
+                return ServiceResult<AcceptProposalResultDto>.ForbiddenResult("You can only accept proposals for your own posts");
+
+            if (proposal.Status != ProposalStatus.Pending)
+                return ServiceResult<AcceptProposalResultDto>.BadRequestResult($"Proposal is already {proposal.Status}");
+
+            proposal.Status = ProposalStatus.Accepted;
+            proposal.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.Proposals.Update(proposal);
+
+            // Create conversation between student and mentor
+            var conversation = new Conversation
+            {
+                StudentId = userId,
+                MentorId = proposal.MentorId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Conversations.AddAsync(conversation);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Notify mentor
+            await _notificationService.CreateNotificationAsync(
+                proposal.MentorId,
+                NotificationType.ProposalAccepted,
+                "Proposal Accepted",
+                $"Your proposal has been accepted! Start a conversation now.",
+                $"{{\"proposalId\": {proposalId}, \"conversationId\": {conversation.Id}}}"
+            );
+
+            return ServiceResult<AcceptProposalResultDto>.SuccessResult(new AcceptProposalResultDto
+            {
+                ProposalId = proposalId,
+                ConversationId = conversation.Id,
+                Message = "Proposal accepted successfully. Conversation created."
+            });
+        }
+
+        public async Task<ServiceResult> RejectProposalAsync(long userId, long proposalId)
+        {
+            var proposal = await _unitOfWork.Proposals.GetByIdWithDetailsAsync(proposalId);
+            if (proposal == null)
+                return ServiceResult.NotFoundResult("Proposal not found");
+
+            if (proposal.Post == null)
+                return ServiceResult.BadRequestResult("Proposal is not linked to a post");
+
+            if (proposal.Post.AuthorId != userId)
+                return ServiceResult.ForbiddenResult("You can only reject proposals for your own posts");
+
+            if (proposal.Status != ProposalStatus.Pending)
+                return ServiceResult.BadRequestResult($"Proposal is already {proposal.Status}");
+
+            proposal.Status = ProposalStatus.Rejected;
+            proposal.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.Proposals.Update(proposal);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Notify mentor
+            await _notificationService.CreateNotificationAsync(
+                proposal.MentorId,
+                NotificationType.ProposalRejected,
+                "Proposal Rejected",
+                "Your proposal has been rejected.",
+                $"{{\"proposalId\": {proposalId}}}"
+            );
+
+            return ServiceResult.SuccessResult("Proposal rejected");
+        }
+
+        public async Task<ServiceResult<List<CommunityProposalDto>>> GetMyProposalsAsync(long userId)
+        {
+            var proposals = await _unitOfWork.Proposals.GetByMentorIdAsync(userId);
+            var postProposals = proposals.Where(p => p.PostId != null);
+
+            var dtos = postProposals.Select(p => MapToProposalDto(p, p.Post, p.Mentor)).ToList();
+            return ServiceResult<List<CommunityProposalDto>>.SuccessResult(dtos);
+        }
+
+        public async Task<ServiceResult<List<CommunityProposalDto>>> GetReceivedProposalsAsync(long userId)
+        {
+            var proposals = await _unitOfWork.Proposals.GetByPostAuthorIdAsync(userId);
+
+            var dtos = proposals.Select(p => MapToProposalDto(p, p.Post, p.Mentor)).ToList();
+            return ServiceResult<List<CommunityProposalDto>>.SuccessResult(dtos);
+        }
+
+        #endregion
+
+        #region Follow
+
+        public async Task<ServiceResult> FollowUserAsync(long followerId, long followingId)
+        {
+            if (followerId == followingId)
+                return ServiceResult.BadRequestResult("You cannot follow yourself");
+
+            var followingUser = await _unitOfWork.Users.GetByIdWithProfilesAsync(followingId);
+            if (followingUser == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            var followerUser = await _unitOfWork.Users.GetByIdWithProfilesAsync(followerId);
+
+            var existingFollow = await _unitOfWork.UserFollows.GetByFollowerAndFollowingAsync(followerId, followingId);
+            if (existingFollow != null)
+                return ServiceResult.BadRequestResult("You are already following this user");
+
+            var follow = new UserFollow
+            {
+                FollowerId = followerId,
+                FollowingId = followingId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.UserFollows.AddAsync(follow);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Notify the user being followed
+            await _notificationService.CreateNotificationAsync(
+                followingId,
+                NotificationType.NewFollower,
+                "New Follower",
+                $"{followerUser?.UserProfile?.FullName ?? "Someone"} started following you",
+                $"{{\"followerId\": {followerId}}}"
+            );
+
+            return ServiceResult.SuccessResult("Successfully followed user");
+        }
+
+        public async Task<ServiceResult> UnfollowUserAsync(long followerId, long followingId)
+        {
+            var follow = await _unitOfWork.UserFollows.GetByFollowerAndFollowingAsync(followerId, followingId);
+            if (follow == null)
+                return ServiceResult.NotFoundResult("You are not following this user");
+
+            _unitOfWork.UserFollows.Remove(follow);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Successfully unfollowed user");
+        }
+
+        public async Task<ServiceResult<bool>> IsFollowingAsync(long followerId, long followingId)
+        {
+            var isFollowing = await _unitOfWork.UserFollows.IsFollowingAsync(followerId, followingId);
+            return ServiceResult<bool>.SuccessResult(isFollowing);
+        }
+
+        #endregion
+
         #region Private Methods
 
-        private CommunityPostListDto MapToPostListDto(CommunityPost post)
+        private CommunityPostListDto MapToPostListDto(CommunityPost post, long? currentUserId = null)
         {
+            var isFollowing = false;
+            if (currentUserId.HasValue && currentUserId.Value != post.AuthorId)
+            {
+                isFollowing = _unitOfWork.UserFollows.IsFollowingAsync(currentUserId.Value, post.AuthorId).GetAwaiter().GetResult();
+            }
+
             return new CommunityPostListDto
             {
                 Id = post.Id,
@@ -227,7 +594,25 @@ namespace MentorEdu.Services.Implementations
                 AuthorId = post.AuthorId,
                 AuthorName = post.Author?.UserProfile?.FullName,
                 AuthorAvatar = post.Author?.UserProfile?.AvatarUrl,
-                CommentCount = post.Comments?.Count ?? 0
+                AuthorRole = post.Author?.Role.ToString(),
+                IsAuthorMentor = post.Author?.Role == UserRole.Mentor,
+                IsFollowing = isFollowing,
+                CommentCount = post.Comments?.Count ?? 0,
+                ProposalCount = post.Proposals?.Count ?? 0,
+                // Category
+                CategoryId = post.CategoryId,
+                CategoryName = post.Category?.Name,
+                // Hashtags
+                Hashtags = post.PostHashtags?.Select(ph => ph.Hashtag?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
+                // Files
+                Files = post.Files?.Select(f => new PostFileDto
+                {
+                    Id = f.Id,
+                    FileUrl = f.FileUrl,
+                    FileName = f.FileName,
+                    FileType = f.FileType,
+                    FileSize = f.FileSize
+                }).ToList() ?? new List<PostFileDto>()
             };
         }
 
@@ -249,6 +634,21 @@ namespace MentorEdu.Services.Implementations
                     IsMentor = post.Author?.Role == UserRole.Mentor
                 },
                 CommentCount = post.Comments?.Count ?? 0,
+                ProposalCount = post.Proposals?.Count ?? 0,
+                // Category
+                CategoryId = post.CategoryId,
+                CategoryName = post.Category?.Name,
+                // Hashtags
+                Hashtags = post.PostHashtags?.Select(ph => ph.Hashtag?.Name ?? "").Where(n => !string.IsNullOrEmpty(n)).ToList() ?? new List<string>(),
+                // Files
+                Files = post.Files?.Select(f => new PostFileDto
+                {
+                    Id = f.Id,
+                    FileUrl = f.FileUrl,
+                    FileName = f.FileName,
+                    FileType = f.FileType,
+                    FileSize = f.FileSize
+                }).ToList() ?? new List<PostFileDto>(),
                 Comments = post.Comments?.Select(c => new CommunityCommentDto
                 {
                     Id = c.Id,
@@ -259,6 +659,25 @@ namespace MentorEdu.Services.Implementations
                     AuthorAvatar = c.Author?.UserProfile?.AvatarUrl,
                     IsAuthorMentor = c.Author?.Role == UserRole.Mentor
                 }).ToList()
+            };
+        }
+
+        private CommunityProposalDto MapToProposalDto(Proposal proposal, CommunityPost? post, User? mentor)
+        {
+            return new CommunityProposalDto
+            {
+                Id = proposal.Id,
+                PostId = proposal.PostId ?? 0,
+                PostTitle = post?.Title,
+                MentorId = proposal.MentorId,
+                MentorName = mentor?.UserProfile?.FullName,
+                MentorAvatar = mentor?.UserProfile?.AvatarUrl,
+                MentorTitle = mentor?.MentorProfile?.Title,
+                Price = proposal.Price,
+                EstimatedHours = proposal.EstimatedHours,
+                Message = proposal.Message,
+                Status = proposal.Status.ToString(),
+                CreatedAt = proposal.CreatedAt
             };
         }
 
