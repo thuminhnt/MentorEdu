@@ -21,11 +21,11 @@ namespace MentorEdu.DTOs.Report
         public long ReportedUserId { get; set; }
         public string? ReportedUserName { get; set; }
 
-        // Order (n?u có)
+        // Order (n?u cï¿½)
         public long? OrderId { get; set; }
         public string? OrderTitle { get; set; }
 
-        // Handler (admin x? lý)
+        // Handler (admin x? lï¿½)
         public long? HandledBy { get; set; }
         public string? HandlerName { get; set; }
     }
@@ -64,7 +64,7 @@ namespace MentorEdu.DTOs.Report
         public string? FullName { get; set; }
         public string? Email { get; set; }
         public string? AvatarUrl { get; set; }
-        public int TotalReports { get; set; } // S? l?n b? báo cáo
+        public int TotalReports { get; set; } // S? l?n b? bï¿½o cï¿½o
     }
 
     /// <summary>
@@ -88,20 +88,24 @@ namespace MentorEdu.DTOs.Report
 
         public long? OrderId { get; set; }
 
-        [Required(ErrorMessage = "Lý do báo cáo là b?t bu?c")]
+        public long? ReviewId { get; set; }
+
+        [Required(ErrorMessage = "LÃ½ do bÃ¡o cÃ¡o lÃ  báº¯t buá»™c")]
         [MaxLength(2000)]
         public string Reason { get; set; } = string.Empty;
+
+        public string? Details { get; set; }
     }
 
     /// <summary>
-    /// Request x? lý Report (Admin)
+    /// Request x? lï¿½ Report (Admin)
     /// </summary>
     public class HandleReportDto
     {
         [Required]
         public long ReportId { get; set; }
 
-        [Required(ErrorMessage = "Tr?ng thái là b?t bu?c")]
+        [Required(ErrorMessage = "Tr?ng thï¿½i lï¿½ b?t bu?c")]
         public string Status { get; set; } = string.Empty; // resolved, rejected, warning, banned
 
         public string? Note { get; set; }

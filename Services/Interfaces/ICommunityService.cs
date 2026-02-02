@@ -38,5 +38,7 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult> FollowUserAsync(long followerId, long followingId);
         Task<ServiceResult> UnfollowUserAsync(long followerId, long followingId);
         Task<ServiceResult<bool>> IsFollowingAsync(long followerId, long followingId);
+        Task<ServiceResult<FollowListDto>> GetFollowersAsync(long userId);
+        Task<ServiceResult<FollowListDto>> GetFollowingAsync(long userId);
     }
 }

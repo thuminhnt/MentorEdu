@@ -46,10 +46,10 @@ namespace MentorEdu.Services.Implementations
                 query = query.Where(p => p.PostHashtags.Any(ph => ph.Hashtag!.Name == searchDto.Hashtag));
             }
 
-            // Category filter
+            // Category filter (simple, no hierarchy)
             if (searchDto.CategoryId.HasValue)
             {
-                query = query.Where(p => p.CategoryId == searchDto.CategoryId);
+                query = query.Where(p => p.CategoryId.HasValue && p.CategoryId.Value == searchDto.CategoryId.Value);
             }
 
             var totalCount = await query.CountAsync();
@@ -133,17 +133,25 @@ namespace MentorEdu.Services.Implementations
                 {
                     if (string.IsNullOrEmpty(fileUrl)) continue;
 
-                    var fileName = Path.GetFileName(fileUrl);
+                    var urlFileName = Path.GetFileName(fileUrl);
                     var extension = Path.GetExtension(fileUrl).ToLower();
                     var fileType = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" }.Contains(extension) 
                         ? "image" 
                         : "document";
 
+                    // Extract original filename from the URL (format: {guid}_{originalName}.ext)
+                    var displayFileName = urlFileName;
+                    var underscoreIndex = urlFileName.IndexOf('_');
+                    if (underscoreIndex > 0 && underscoreIndex < urlFileName.Length - 1)
+                    {
+                        displayFileName = urlFileName.Substring(underscoreIndex + 1);
+                    }
+
                     var postFile = new CommunityPostFile
                     {
                         PostId = post.Id,
                         FileUrl = fileUrl,
-                        FileName = fileName,
+                        FileName = displayFileName,
                         FileType = fileType,
                         CreatedAt = DateTime.UtcNow
                     };
@@ -152,11 +160,12 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.SaveChangesAsync();
             }
 
-            // Notify mentors about relevant post based on hashtags
-            if (request.Hashtags != null && request.Hashtags.Count > 0)
-            {
-                await _notificationService.NotifyMentorsAboutRelevantPostAsync(post.Id, request.Hashtags);
-            }
+            // Notify mentors about relevant post based on category and hashtags
+            await _notificationService.NotifyMentorsAboutRelevantPostAsync(
+                post.Id, 
+                request.CategoryId, 
+                request.Hashtags ?? new List<string>()
+            );
 
             return await GetPostByIdAsync(post.Id);
         }
@@ -679,6 +688,66 @@ namespace MentorEdu.Services.Implementations
                 Status = proposal.Status.ToString(),
                 CreatedAt = proposal.CreatedAt
             };
+        }
+
+        public async Task<ServiceResult<FollowListDto>> GetFollowersAsync(long userId)
+        {
+            var followers = await _unitOfWork.UserFollows.GetFollowersByUserIdAsync(userId);
+            var count = await _unitOfWork.UserFollows.GetFollowerCountAsync(userId);
+
+            var users = new List<FollowUserDto>();
+            foreach (var follow in followers)
+            {
+                var follower = await _unitOfWork.Users.GetByIdAsync(follow.FollowerId);
+                if (follower != null)
+                {
+                    var profile = await _unitOfWork.UserProfiles.GetByUserIdAsync(follower.Id);
+                    users.Add(new FollowUserDto
+                    {
+                        Id = follower.Id,
+                        FullName = profile?.FullName ?? "Unknown",
+                        AvatarUrl = profile?.AvatarUrl,
+                        Role = follower.Role.ToString(),
+                        IsMentor = follower.Role == UserRole.Mentor
+                    });
+                }
+            }
+
+            return ServiceResult<FollowListDto>.SuccessResult(new FollowListDto
+            {
+                Count = count,
+                Users = users
+            });
+        }
+
+        public async Task<ServiceResult<FollowListDto>> GetFollowingAsync(long userId)
+        {
+            var following = await _unitOfWork.UserFollows.GetFollowingByUserIdAsync(userId);
+            var count = await _unitOfWork.UserFollows.GetFollowingCountAsync(userId);
+
+            var users = new List<FollowUserDto>();
+            foreach (var follow in following)
+            {
+                var followedUser = await _unitOfWork.Users.GetByIdAsync(follow.FollowingId);
+                if (followedUser != null)
+                {
+                    var profile = await _unitOfWork.UserProfiles.GetByUserIdAsync(followedUser.Id);
+                    users.Add(new FollowUserDto
+                    {
+                        Id = followedUser.Id,
+                        FullName = profile?.FullName ?? "Unknown",
+                        AvatarUrl = profile?.AvatarUrl,
+                        Role = followedUser.Role.ToString(),
+                        IsMentor = followedUser.Role == UserRole.Mentor
+                    });
+                }
+            }
+
+            return ServiceResult<FollowListDto>.SuccessResult(new FollowListDto
+            {
+                Count = count,
+                Users = users
+            });
         }
 
         #endregion

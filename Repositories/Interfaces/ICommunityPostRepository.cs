@@ -4,7 +4,7 @@ namespace MentorEdu.Repositories.Interfaces
 {
     public interface ICommunityPostRepository : IRepository<CommunityPost>
     {
-        IQueryable<CommunityPost> Query();
+        new IQueryable<CommunityPost> Query();
         Task<CommunityPost?> GetByIdWithCommentsAsync(long id);
         Task<IEnumerable<CommunityPost>> GetByAuthorIdAsync(long authorId);
         Task<(IEnumerable<CommunityPost> Items, int TotalCount)> GetPagedAsync(

@@ -11,7 +11,7 @@ namespace MentorEdu.Repositories.Implementations
         {
         }
 
-        public IQueryable<CommunityPost> Query()
+        public new IQueryable<CommunityPost> Query()
         {
             return _dbSet.AsQueryable();
         }

@@ -40,13 +40,7 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("name");
 
-                    b.Property<long?>("ParentId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("parent_id");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("ParentId");
 
                     b.ToTable("categories", (string)null);
                 });
@@ -826,6 +820,10 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Details")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("details");
+
                     b.Property<long?>("HandledBy")
                         .HasColumnType("bigint")
                         .HasColumnName("handled_by");
@@ -846,6 +844,10 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("reporter_id");
 
+                    b.Property<long?>("ReviewId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("review_id");
+
                     b.Property<string>("Status")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
@@ -864,6 +866,8 @@ namespace MentorEdu.Data.Migrations
                     b.HasIndex("ReportedUserId");
 
                     b.HasIndex("ReporterId");
+
+                    b.HasIndex("ReviewId");
 
                     b.ToTable("reports", (string)null);
                 });
@@ -897,6 +901,14 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("expected_hours");
 
+                    b.Property<long?>("MentorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mentor_id");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("reject_reason");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -919,6 +931,8 @@ namespace MentorEdu.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("MentorId");
 
                     b.HasIndex("StudentId");
 
@@ -1544,16 +1558,6 @@ namespace MentorEdu.Data.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("MentorEdu.Models.Category", b =>
-                {
-                    b.HasOne("MentorEdu.Models.Category", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Parent");
-                });
-
             modelBuilder.Entity("MentorEdu.Models.CategoryHashtag", b =>
                 {
                     b.HasOne("MentorEdu.Models.Category", "Category")
@@ -1895,6 +1899,10 @@ namespace MentorEdu.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MentorEdu.Models.Review", "Review")
+                        .WithMany()
+                        .HasForeignKey("ReviewId");
+
                     b.Navigation("Handler");
 
                     b.Navigation("Order");
@@ -1902,6 +1910,8 @@ namespace MentorEdu.Data.Migrations
                     b.Navigation("ReportedUser");
 
                     b.Navigation("Reporter");
+
+                    b.Navigation("Review");
                 });
 
             modelBuilder.Entity("MentorEdu.Models.Request", b =>
@@ -1910,6 +1920,10 @@ namespace MentorEdu.Data.Migrations
                         .WithMany("Requests")
                         .HasForeignKey("CategoryId");
 
+                    b.HasOne("MentorEdu.Models.User", "Mentor")
+                        .WithMany()
+                        .HasForeignKey("MentorId");
+
                     b.HasOne("MentorEdu.Models.User", "Student")
                         .WithMany("Requests")
                         .HasForeignKey("StudentId")
@@ -1917,6 +1931,8 @@ namespace MentorEdu.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+
+                    b.Navigation("Mentor");
 
                     b.Navigation("Student");
                 });
@@ -2110,8 +2126,6 @@ namespace MentorEdu.Data.Migrations
             modelBuilder.Entity("MentorEdu.Models.Category", b =>
                 {
                     b.Navigation("CategoryHashtags");
-
-                    b.Navigation("Children");
 
                     b.Navigation("MentorCategories");
 

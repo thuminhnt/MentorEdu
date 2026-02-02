@@ -163,9 +163,7 @@ namespace MentorEdu.Services.Implementations
 
             var user = await _unitOfWork.Users.GetByIdWithProfilesAsync(userId);
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 var message = new Message
                 {
@@ -215,7 +213,6 @@ namespace MentorEdu.Services.Implementations
                 }
 
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 var dto = new MessageDto
                 {
@@ -233,12 +230,7 @@ namespace MentorEdu.Services.Implementations
                 };
 
                 return ServiceResult<MessageDto>.SuccessResult(dto);
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult<PagedResponse<MessageDto>>> GetMessagesAsync(long userId, GetMessagesDto request)

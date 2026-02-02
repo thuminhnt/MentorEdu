@@ -1,3 +1,4 @@
+using MentorEdu.DTOs.Chat;
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Request;
 using MentorEdu.DTOs.User;
@@ -11,8 +12,11 @@ namespace MentorEdu.Services.Implementations
 {
     public class RequestService : BaseService, IRequestService
     {
-        public RequestService(IUnitOfWork unitOfWork) : base(unitOfWork)
+        private readonly IChatService _chatService;
+
+        public RequestService(IUnitOfWork unitOfWork, IChatService chatService) : base(unitOfWork)
         {
+            _chatService = chatService;
         }
 
         public async Task<ServiceResult<RequestDetailDto>> GetByIdAsync(long requestId)
@@ -56,9 +60,23 @@ namespace MentorEdu.Services.Implementations
                     return ServiceResult<RequestDetailDto>.FailResult("Category does not exist");
             }
 
+            // Validate mentor if specified
+            if (request.MentorId.HasValue)
+            {
+                var mentor = await _unitOfWork.Users.GetByIdWithProfilesAsync(request.MentorId.Value);
+                if (mentor == null || mentor.Role != UserRole.Mentor)
+                    return ServiceResult<RequestDetailDto>.FailResult("Invalid mentor specified");
+
+                // Check if already has pending request for this mentor
+                var existingRequest = await _unitOfWork.Requests.GetPendingRequestByStudentAndMentorAsync(studentId, request.MentorId.Value);
+                if (existingRequest != null)
+                    return ServiceResult<RequestDetailDto>.FailResult("You already have a pending request with this mentor. Please wait for their response.");
+            }
+
             var newRequest = new Request
             {
                 StudentId = studentId,
+                MentorId = request.MentorId,
                 Title = request.Title,
                 Description = request.Description,
                 CategoryId = request.CategoryId,
@@ -173,6 +191,86 @@ namespace MentorEdu.Services.Implementations
         {
             searchDto.Status = RequestStatus.Open;
             return await GetRequestsAsync(searchDto);
+        }
+
+        public async Task<ServiceResult<PagedResponse<RequestListDto>>> GetReceivedRequestsAsync(long mentorId, int pageNumber, int pageSize)
+        {
+            // Get requests targeted to this mentor
+            var allRequests = await _unitOfWork.Requests.GetByMentorIdAsync(mentorId);
+            var totalCount = allRequests.Count();
+
+            var pagedRequests = allRequests
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize);
+
+            var dtos = pagedRequests.Select(MapToListDto);
+            var response = PagedResponse<RequestListDto>.Create(dtos, pageNumber, pageSize, totalCount);
+
+            return ServiceResult<PagedResponse<RequestListDto>>.SuccessResult(response);
+        }
+
+        public async Task<ServiceResult<AcceptRequestResultDto>> AcceptRequestAsync(long requestId, long mentorId)
+        {
+            var request = await _unitOfWork.Requests.GetByIdWithDetailsAsync(requestId);
+            
+            if (request == null)
+                return ServiceResult<AcceptRequestResultDto>.NotFoundResult("Request not found");
+
+            // Verify mentor is the target of this request
+            if (request.MentorId != mentorId)
+                return ServiceResult<AcceptRequestResultDto>.ForbiddenResult("You cannot accept this request");
+
+            if (request.Status != RequestStatus.Open)
+                return ServiceResult<AcceptRequestResultDto>.FailResult($"Request cannot be accepted. Current status: {request.Status}");
+
+            // Update request status
+            request.Status = RequestStatus.Accepted;
+            request.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.Requests.Update(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Create conversation between mentor and student
+            var conversationResult = await _chatService.GetOrCreateConversationAsync(mentorId, new CreateConversationDto
+            {
+                ParticipantId = request.StudentId
+            });
+
+            var conversationId = conversationResult.Success && conversationResult.Data != null
+                ? conversationResult.Data.Id
+                : 0;
+
+            return ServiceResult<AcceptRequestResultDto>.SuccessResult(new AcceptRequestResultDto
+            {
+                RequestId = requestId,
+                ConversationId = conversationId,
+                Message = "Request accepted successfully"
+            });
+        }
+
+        public async Task<ServiceResult> RejectRequestAsync(long requestId, long mentorId, string? reason)
+        {
+            var request = await _unitOfWork.Requests.GetByIdAsync(requestId);
+            
+            if (request == null)
+                return ServiceResult.NotFoundResult("Request not found");
+
+            // Verify mentor is the target of this request  
+            if (request.MentorId != mentorId)
+                return ServiceResult.ForbiddenResult("You cannot reject this request");
+
+            if (request.Status != RequestStatus.Open)
+                return ServiceResult.FailResult($"Request cannot be rejected. Current status: {request.Status}");
+
+            // Update request status
+            request.Status = RequestStatus.Rejected;
+            request.RejectReason = reason;
+            request.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.Requests.Update(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Request rejected successfully");
         }
 
         #region Private Methods

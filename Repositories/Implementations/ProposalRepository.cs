@@ -16,9 +16,9 @@ namespace MentorEdu.Repositories.Implementations
         {
             return await _dbSet
                 .Include(p => p.Request)
-                    .ThenInclude(r => r.Student)
+                    .ThenInclude(r => r!.Student)
                 .Include(p => p.Post)
-                    .ThenInclude(cp => cp.Author)
+                    .ThenInclude(cp => cp!.Author)
                 .Include(p => p.Mentor)
                     .ThenInclude(m => m.UserProfile)
                 .Include(p => p.Mentor)
@@ -43,7 +43,7 @@ namespace MentorEdu.Repositories.Implementations
             return await _dbSet
                 .Where(p => p.MentorId == mentorId)
                 .Include(p => p.Request)
-                    .ThenInclude(r => r.Student)
+                    .ThenInclude(r => r!.Student)
                 .Include(p => p.Post)
                 .Include(p => p.Mentor)
                     .ThenInclude(m => m.UserProfile)

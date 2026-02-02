@@ -380,6 +380,34 @@ namespace MentorEdu.Controllers.Api
             return Ok(ApiResponse<bool>.SuccessResponse(result.Data));
         }
 
+        /// <summary>
+        /// Get followers count and list for a user
+        /// </summary>
+        [HttpGet("follow/{userId}/followers")]
+        public async Task<ActionResult<ApiResponse<FollowListDto>>> GetFollowers(long userId)
+        {
+            var result = await _communityService.GetFollowersAsync(userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<FollowListDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<FollowListDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Get following count and list for a user
+        /// </summary>
+        [HttpGet("follow/{userId}/following")]
+        public async Task<ActionResult<ApiResponse<FollowListDto>>> GetFollowing(long userId)
+        {
+            var result = await _communityService.GetFollowingAsync(userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<FollowListDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<FollowListDto>.SuccessResponse(result.Data!));
+        }
+
         #endregion
 
         private long GetCurrentUserId()

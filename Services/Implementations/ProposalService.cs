@@ -142,10 +142,39 @@ namespace MentorEdu.Services.Implementations
             if (proposal.Status != ProposalStatus.Pending)
                 return ServiceResult.FailResult("Proposal is no longer pending");
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            // Get student wallet and validate balance
+            var proposalPrice = proposal.Price ?? 0;
+            var studentWallet = await _unitOfWork.Wallets.GetByUserIdAsync(studentId);
+            
+            if (studentWallet == null)
             {
+                // Create wallet if not exists
+                studentWallet = new Wallet
+                {
+                    UserId = studentId,
+                    Balance = 0,
+                    LockedBalance = 0,
+                    Currency = "VND",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Wallets.AddAsync(studentWallet);
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            var availableBalance = studentWallet.Balance - studentWallet.LockedBalance;
+            if (availableBalance < proposalPrice)
+            {
+                return ServiceResult.FailResult($"Insufficient balance. Required: {proposalPrice:N0} VND, Available: {availableBalance:N0} VND. Please top up your wallet.");
+            }
+
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
+            {
+                // Deduct funds from student wallet
+                studentWallet.Balance -= proposalPrice;
+                studentWallet.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Wallets.Update(studentWallet);
+
                 // Accept this proposal
                 proposal.Status = ProposalStatus.Accepted;
                 proposal.UpdatedAt = DateTime.UtcNow;
@@ -169,16 +198,17 @@ namespace MentorEdu.Services.Implementations
                     _unitOfWork.Requests.Update(request);
                 }
 
-                // Create order
+                // Create order - now with InProgress status since payment is done
                 var order = new Order
                 {
                     RequestId = proposal.RequestId,
                     ProposalId = proposal.Id,
                     StudentId = studentId,
                     MentorId = proposal.MentorId,
-                    BillingType = BillingType.Fixed, // Default, can be changed
+                    BillingType = BillingType.Fixed,
                     AgreedPrice = proposal.Price,
-                    Status = OrderStatus.PendingPayment,
+                    Status = OrderStatus.InProgress,
+                    StartedAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -186,29 +216,34 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Orders.AddAsync(order);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Create escrow
+                // Create escrow with the held funds
                 var escrow = new Escrow
                 {
                     OrderId = order.Id,
-                    Amount = proposal.Price ?? 0,
+                    Amount = proposalPrice,
                     Status = EscrowStatus.Holding,
                     CreatedAt = DateTime.UtcNow
                 };
 
                 await _unitOfWork.Escrows.AddAsync(escrow);
+
+                // Create payment transaction record
+                var transaction = new Transaction
+                {
+                    WalletId = studentWallet.Id,
+                    OrderId = order.Id,
+                    Type = TransactionType.EscrowHold,
+                    Amount = proposalPrice,
+                    Status = TransactionStatus.Success,
+                    Description = $"Payment for order #{order.Id} - {proposal.Request?.Title ?? "Mentoring session"}",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.Transactions.AddAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                await _unitOfWork.CommitTransactionAsync();
-
-                // TODO: Send notification to mentor
-
-                return ServiceResult.SuccessResult("Proposal accepted successfully. Order has been created.");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+                return ServiceResult.SuccessResult("Proposal accepted and payment processed successfully. Order is now active.");
+            });
         }
 
         public async Task<ServiceResult> RejectProposalAsync(long proposalId, long studentId, string? reason = null)

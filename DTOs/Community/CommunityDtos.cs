@@ -167,4 +167,20 @@ namespace MentorEdu.DTOs.Community
         public long ConversationId { get; set; }
         public string Message { get; set; } = "Proposal accepted successfully";
     }
+
+    // === FOLLOW DTOs ===
+    public class FollowListDto
+    {
+        public int Count { get; set; }
+        public List<FollowUserDto> Users { get; set; } = new();
+    }
+
+    public class FollowUserDto
+    {
+        public long Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string? AvatarUrl { get; set; }
+        public string Role { get; set; } = "Student";
+        public bool IsMentor { get; set; }
+    }
 }

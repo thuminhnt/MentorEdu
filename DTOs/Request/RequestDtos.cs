@@ -110,4 +110,22 @@ namespace MentorEdu.DTOs.Request
         public string? SortBy { get; set; } = "createdAt";
         public bool SortDescending { get; set; } = true;
     }
+
+    /// <summary>
+    /// Result DTO for accepting a request
+    /// </summary>
+    public class AcceptRequestResultDto
+    {
+        public long RequestId { get; set; }
+        public long ConversationId { get; set; }
+        public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Reject Request DTO
+    /// </summary>
+    public class RejectRequestDto
+    {
+        public string? Reason { get; set; }
+    }
 }

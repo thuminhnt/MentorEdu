@@ -77,7 +77,7 @@ namespace MentorEdu.Controllers.Api
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 hashtags = hashtags
-                    .Where(h => h.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+                    .Where(h => h.Name != null && h.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
 
