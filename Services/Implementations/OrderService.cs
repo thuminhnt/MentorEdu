@@ -99,9 +99,7 @@ namespace MentorEdu.Services.Implementations
             if (order.Status == OrderStatus.Completed || order.Status == OrderStatus.Cancelled)
                 return ServiceResult.FailResult("Cannot cancel this order");
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 var oldStatus = order.Status;
                 order.Status = OrderStatus.Cancelled;
@@ -153,15 +151,9 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.OrderDetails.AddAsync(orderDetail);
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 return ServiceResult.SuccessResult("Order cancelled successfully");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult> CompleteOrderAsync(long orderId, long userId)
@@ -177,9 +169,7 @@ namespace MentorEdu.Services.Implementations
             if (order.Status != OrderStatus.InProgress)
                 return ServiceResult.FailResult("Only in-progress orders can be completed");
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 var oldStatus = order.Status;
                 order.Status = OrderStatus.Completed;
@@ -244,15 +234,9 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.OrderDetails.AddAsync(orderDetail);
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 return ServiceResult.SuccessResult("Order completed successfully");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult> DisputeOrderAsync(long orderId, long userId, string reason)
@@ -322,18 +306,11 @@ namespace MentorEdu.Services.Implementations
 
             if (order.Status != OrderStatus.InProgress)
             {
-                // Start order if pending payment (assuming payment done)
                 if (order.Status == OrderStatus.PendingPayment)
                 {
-                    order.Status = OrderStatus.InProgress;
-                    order.StartedAt = DateTime.UtcNow;
-                    order.UpdatedAt = DateTime.UtcNow;
-                    _unitOfWork.Orders.Update(order);
+                    return ServiceResult<WorkSessionDetailDto>.FailResult("Cannot start session - payment has not been completed yet.");
                 }
-                else
-                {
-                    return ServiceResult<WorkSessionDetailDto>.FailResult("Order is not in a state that can be started");
-                }
+                return ServiceResult<WorkSessionDetailDto>.FailResult("Order is not in progress. Cannot start a session.");
             }
 
             // Check for active session

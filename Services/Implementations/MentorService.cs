@@ -229,6 +229,7 @@ namespace MentorEdu.Services.Implementations
                 Rating = r.Rating,
                 Comment = r.Comment,
                 CreatedAt = r.CreatedAt,
+                StudentId = r.FromUserId,
                 StudentName = r.FromUser?.UserProfile?.FullName,
                 StudentAvatar = r.FromUser?.UserProfile?.AvatarUrl,
                 OrderTitle = r.Order?.Request?.Title

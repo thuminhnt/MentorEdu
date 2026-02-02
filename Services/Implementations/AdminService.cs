@@ -77,7 +77,7 @@ namespace MentorEdu.Services.Implementations
                 query = query.Where(u => u.IsActive == isActive.Value);
 
             if (!string.IsNullOrWhiteSpace(keyword))
-                query = query.Where(u => u.Email.Contains(keyword) || u.UserProfile.FullName.Contains(keyword));
+                query = query.Where(u => u.Email.Contains(keyword) || (u.UserProfile != null && u.UserProfile.FullName != null && u.UserProfile.FullName.Contains(keyword)));
 
             var totalCount = await query.CountAsync();
 
@@ -154,8 +154,7 @@ namespace MentorEdu.Services.Implementations
             if (existingUser != null)
                 return ServiceResult<UserDetailDto>.FailResult("Email already exists");
 
-            await _unitOfWork.BeginTransactionAsync();
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 // Create user
                 var user = new User
@@ -222,7 +221,6 @@ namespace MentorEdu.Services.Implementations
                 }
 
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 // Return created user detail
                 var dto = new UserDetailDto
@@ -244,12 +242,7 @@ namespace MentorEdu.Services.Implementations
                 };
 
                 return ServiceResult<UserDetailDto>.CreatedResult(dto, "User created successfully");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult<UserDetailDto>> AdminUpdateUserAsync(long userId, AdminUpdateUserDto request)
@@ -278,17 +271,10 @@ namespace MentorEdu.Services.Implementations
             user.IsActive = request.IsActive;
             user.UpdatedAt = DateTime.UtcNow;
 
-            // ? Update password if provided
+            // Update password if provided
             if (!string.IsNullOrWhiteSpace(request.Password))
             {
-                // ?? DEBUG LOG
-                Console.WriteLine($"?? Updating password for user {userId}. Old hash: {user.PasswordHash?.Substring(0, 20)}...");
                 user.PasswordHash = HashPassword(request.Password);
-                Console.WriteLine($"?? New hash: {user.PasswordHash?.Substring(0, 20)}...");
-            }
-            else
-            {
-                Console.WriteLine($"?? No password provided for user {userId}");
             }
 
             _unitOfWork.Users.Update(user);
@@ -354,8 +340,7 @@ namespace MentorEdu.Services.Implementations
             if (hasActiveOrders)
                 return ServiceResult.FailResult("Cannot delete user with active orders");
 
-            await _unitOfWork.BeginTransactionAsync();
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 // Delete related data (cascade)
                 if (user.UserProfile != null)
@@ -377,15 +362,9 @@ namespace MentorEdu.Services.Implementations
                 _unitOfWork.Users.Remove(user);
 
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 return ServiceResult.SuccessResult("User deleted successfully");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult> ActivateUserAsync(long userId)
@@ -471,7 +450,7 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult<CategoryResponseDto>> GetCategoryByIdAsync(long categoryId)
         {
-            var category = await _unitOfWork.Categories.GetWithChildrenAsync(categoryId);
+            var category = await _unitOfWork.Categories.GetByIdAsync(categoryId);
             
             if (category == null)
                 return ServiceResult<CategoryResponseDto>.NotFoundResult("Category not found");
@@ -482,18 +461,10 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult<CategoryResponseDto>> CreateCategoryAsync(CreateCategoryRequest request)
         {
-            if (request.ParentId.HasValue)
-            {
-                var parent = await _unitOfWork.Categories.GetByIdAsync(request.ParentId.Value);
-                if (parent == null)
-                    return ServiceResult<CategoryResponseDto>.FailResult("Parent category does not exist");
-            }
-
             var category = new Category
             {
                 Name = request.Name,
-                Description = request.Description,
-                ParentId = request.ParentId
+                Description = request.Description
             };
 
             await _unitOfWork.Categories.AddAsync(category);
@@ -503,8 +474,7 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = category.Id,
                 Name = category.Name,
-                Description = category.Description,
-                ParentId = category.ParentId
+                Description = category.Description
             };
 
             return ServiceResult<CategoryResponseDto>.CreatedResult(dto, "Category created successfully");
@@ -517,12 +487,8 @@ namespace MentorEdu.Services.Implementations
             if (category == null)
                 return ServiceResult<CategoryResponseDto>.NotFoundResult("Category not found");
 
-            if (request.ParentId.HasValue && request.ParentId.Value == categoryId)
-                return ServiceResult<CategoryResponseDto>.FailResult("Category cannot be its own parent");
-
             category.Name = request.Name;
             category.Description = request.Description;
-            category.ParentId = request.ParentId;
 
             _unitOfWork.Categories.Update(category);
             await _unitOfWork.SaveChangesAsync();
@@ -531,8 +497,7 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = category.Id,
                 Name = category.Name,
-                Description = category.Description,
-                ParentId = category.ParentId
+                Description = category.Description
             };
 
             return ServiceResult<CategoryResponseDto>.SuccessResult(dto, "Category updated successfully");
@@ -540,13 +505,10 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult> DeleteCategoryAsync(long categoryId)
         {
-            var category = await _unitOfWork.Categories.GetWithChildrenAsync(categoryId);
+            var category = await _unitOfWork.Categories.GetByIdAsync(categoryId);
             
             if (category == null)
                 return ServiceResult.NotFoundResult("Category not found");
-
-            if (category.Children?.Any() == true)
-                return ServiceResult.FailResult("Cannot delete category with child categories");
 
             var requestsCount = await _unitOfWork.Requests.CountAsync(r => r.CategoryId == categoryId);
             if (requestsCount > 0)
@@ -881,7 +843,7 @@ namespace MentorEdu.Services.Implementations
 
             var proposals = await query
                 .Include(p => p.Mentor).ThenInclude(m => m.UserProfile)
-                .Include(p => p.Request).ThenInclude(r => r.Student).ThenInclude(s => s.UserProfile)
+                .Include(p => p.Request).ThenInclude(r => r!.Student).ThenInclude(s => s.UserProfile)
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
@@ -1093,9 +1055,7 @@ namespace MentorEdu.Services.Implementations
             if (order.Escrow == null || order.Escrow.Status != EscrowStatus.Holding)
                 return ServiceResult.FailResult("No escrow to refund");
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 var refundAmount = request.FullRefund ? order.Escrow.Amount : request.Amount;
 
@@ -1149,15 +1109,9 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.OrderDetails.AddAsync(orderDetail);
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 return ServiceResult.SuccessResult($"Refund of {refundAmount:N0} VND processed successfully");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         #endregion
@@ -1784,9 +1738,7 @@ namespace MentorEdu.Services.Implementations
             // Get submission count
             var submissionCount = await _unitOfWork.MentorApplicationHistories.GetSubmissionCountAsync(userId);
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 // Update mentor profile status (DO NOT change user role - user will confirm later)
                 mentorProfile.ApprovalStatus = MentorApprovalStatus.Approved;
@@ -1831,7 +1783,6 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Notifications.AddAsync(notification);
 
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 // Send email notification to user
                 var fullName = user.UserProfile?.FullName ?? user.Email;
@@ -1845,12 +1796,7 @@ namespace MentorEdu.Services.Implementations
                 }
 
                 return ServiceResult.SuccessResult("Mentor application approved successfully. User needs to confirm the role switch.");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
 
@@ -2091,10 +2037,8 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = category.Id,
                 Name = category.Name,
-                Description = category.Description,
-                ParentId = category.ParentId,
-                ParentName = category.Parent?.Name,
-                Children = category.Children?.Select(c => MapToCategoryDto(c)).ToList()
+                Description = category.Description
+                // No more parent-child hierarchy
             };
         }
 

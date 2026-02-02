@@ -285,6 +285,90 @@ namespace MentorEdu.Controllers.Api
                 $"{uploadedUrls.Count} file(s) uploaded successfully"));
         }
 
+        /// <summary>
+        /// Upload files for community posts (max 10MB each, 2 files)
+        /// </summary>
+        [HttpPost("upload/community-post")]
+        [Authorize]
+        [RequestSizeLimit(25 * 1024 * 1024)]
+        public async Task<ActionResult<ApiResponse<UploadResult>>> UploadCommunityPostFiles([FromForm] List<IFormFile> files)
+        {
+            var allowedExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".pdf", ".doc", ".docx",
+                ".png", ".jpg", ".jpeg", ".gif", ".webp"
+            };
+
+            if (files == null || files.Count == 0)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("No files provided"));
+
+            if (files.Count > 2)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("Maximum 2 files allowed"));
+
+            var uploadedUrls = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var file in files)
+            {
+                // Validate size (10MB)
+                if (file.Length > 10 * 1024 * 1024)
+                {
+                    errors.Add($"{file.FileName}: File size exceeds 10MB limit");
+                    continue;
+                }
+
+                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (!allowedExts.Contains(extension))
+                {
+                    errors.Add($"{file.FileName}: Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg, gif, webp");
+                    continue;
+                }
+
+                try
+                {
+                    var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "community-posts");
+                    if (!Directory.Exists(uploadPath))
+                        Directory.CreateDirectory(uploadPath);
+
+                    // Keep original filename but add GUID prefix for uniqueness
+                    var safeOriginalName = Path.GetFileNameWithoutExtension(file.FileName)
+                        .Replace(" ", "_")
+                        .Replace("/", "_")
+                        .Replace("\\", "_");
+                    var uniqueFileName = $"{Guid.NewGuid().ToString().Substring(0, 8)}_{safeOriginalName}{extension}";
+                    var filePath = Path.Combine(uploadPath, uniqueFileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    var fileUrl = $"/uploads/community-posts/{uniqueFileName}";
+                    uploadedUrls.Add(fileUrl);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{file.FileName}: Upload failed - {ex.Message}");
+                }
+            }
+
+            if (uploadedUrls.Count == 0)
+            {
+                return BadRequest(ApiResponse<UploadResult>.FailResponse(
+                    $"No files were uploaded. Errors: {string.Join("; ", errors)}"
+                ));
+            }
+
+            var result = new UploadResult
+            {
+                FileUrls = uploadedUrls,
+                Errors = errors
+            };
+
+            return Ok(ApiResponse<UploadResult>.SuccessResponse(result,
+                $"{uploadedUrls.Count} file(s) uploaded successfully"));
+        }
+
     }
 
     public class UploadResult

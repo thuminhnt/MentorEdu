@@ -32,6 +32,17 @@ namespace MentorEdu.Repositories.Implementations
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Request>> GetByMentorIdAsync(long mentorId)
+        {
+            return await _dbSet
+                .Where(r => r.MentorId == mentorId)
+                .Include(r => r.Student)
+                    .ThenInclude(s => s.UserProfile)
+                .Include(r => r.Category)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<Request>> GetByStatusAsync(RequestStatus status)
         {
             return await _dbSet
@@ -60,6 +71,13 @@ namespace MentorEdu.Repositories.Implementations
                 .Include(r => r.Category)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
+        }
+
+        public async Task<Request?> GetPendingRequestByStudentAndMentorAsync(long studentId, long mentorId)
+        {
+            return await _dbSet
+                .Where(r => r.StudentId == studentId && r.MentorId == mentorId && r.Status == RequestStatus.Open)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<(IEnumerable<Request> Items, int TotalCount)> GetPagedWithFiltersAsync(

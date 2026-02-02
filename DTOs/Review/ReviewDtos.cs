@@ -33,7 +33,8 @@ namespace MentorEdu.DTOs.Review
         public string? Comment { get; set; }
         public DateTime? CreatedAt { get; set; }
 
-        // Student (ng??i ?ánh giá)
+        // Student (ngÆ°á»i Ä‘Ã¡nh giÃ¡)
+        public long StudentId { get; set; }
         public string? StudentName { get; set; }
         public string? StudentAvatar { get; set; }
 
@@ -71,7 +72,7 @@ namespace MentorEdu.DTOs.Review
         [Required]
         public long OrderId { get; set; }
 
-        [Required(ErrorMessage = "Rating là b?t bu?c")]
+        [Required(ErrorMessage = "Rating lï¿½ b?t bu?c")]
         [Range(1, 5, ErrorMessage = "Rating t? 1 ??n 5")]
         public int Rating { get; set; }
 

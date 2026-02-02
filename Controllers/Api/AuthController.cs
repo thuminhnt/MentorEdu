@@ -15,10 +15,14 @@ namespace MentorEdu.Controllers.Api
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IConfiguration _configuration;
+        private readonly string _frontendUrl;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, IConfiguration configuration)
         {
             _authService = authService;
+            _configuration = configuration;
+            _frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
         }
 
         /// <summary>
@@ -214,9 +218,9 @@ namespace MentorEdu.Controllers.Api
                 
                 if (error == "access_denied")
                 {
-                    return Redirect($"http://localhost:5173/{redirectPage}?cancelled=true");
+                    return Redirect($"{_frontendUrl}/{redirectPage}?cancelled=true");
                 }
-                return Redirect($"http://localhost:5173/{redirectPage}?error={Uri.EscapeDataString(error)}");
+                return Redirect($"{_frontendUrl}/{redirectPage}?error={Uri.EscapeDataString(error)}");
             }
 
             // Try to authenticate - wrap in try-catch to handle any authentication failures
@@ -227,13 +231,13 @@ namespace MentorEdu.Controllers.Api
             }
             catch (Exception)
             {
-                return Redirect("http://localhost:5173/login?error=Authentication%20failed");
+                return Redirect($"{_frontendUrl}/login?error=Authentication%20failed");
             }
 
             if (!authenticateResult2.Succeeded)
             {
                 // Redirect to frontend with error
-                return Redirect("http://localhost:5173/login?error=Authentication%20failed");
+                return Redirect($"{_frontendUrl}/login?error=Authentication%20failed");
             }
 
             var claims = authenticateResult2.Principal?.Identities.FirstOrDefault()?.Claims;
@@ -243,7 +247,7 @@ namespace MentorEdu.Controllers.Api
             
             if (string.IsNullOrEmpty(email))
             {
-                return Redirect("http://localhost:5173/login?error=Email%20not%20found");
+                return Redirect($"{_frontendUrl}/login?error=Email%20not%20found");
             }
 
             // Get role from state if provided
@@ -263,11 +267,11 @@ namespace MentorEdu.Controllers.Api
             if (!result.Success)
             {
                 var errorMessage = Uri.EscapeDataString(result.Message ?? "Login failed");
-                return Redirect($"http://localhost:5173/login?error={errorMessage}");
+                return Redirect($"{_frontendUrl}/login?error={errorMessage}");
             }
 
             // Redirect back to frontend with tokens
-            return Redirect($"http://localhost:5173/login?token={result.Data!.Token}&refreshToken={result.Data.RefreshToken}");
+            return Redirect($"{_frontendUrl}/login?token={result.Data!.Token}&refreshToken={result.Data.RefreshToken}");
         }
 
         #endregion

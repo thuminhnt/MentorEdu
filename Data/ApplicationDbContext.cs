@@ -281,12 +281,7 @@ namespace MentorEdu.Data
                 .HasIndex(h => h.Name)
                 .IsUnique();
 
-            // Category - Self-referencing
-            modelBuilder.Entity<Category>()
-                .HasOne(c => c.Parent)
-                .WithMany(c => c.Children)
-                .HasForeignKey(c => c.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
+
 
             // Request
             modelBuilder.Entity<Request>()

@@ -7,9 +7,11 @@ namespace MentorEdu.Repositories.Interfaces
     {
         Task<Request?> GetByIdWithDetailsAsync(long id);
         Task<IEnumerable<Request>> GetByStudentIdAsync(long studentId);
+        Task<IEnumerable<Request>> GetByMentorIdAsync(long mentorId);
         Task<IEnumerable<Request>> GetByStatusAsync(RequestStatus status);
         Task<IEnumerable<Request>> GetByCategoryIdAsync(long categoryId);
         Task<IEnumerable<Request>> GetOpenRequestsAsync();
+        Task<Request?> GetPendingRequestByStudentAndMentorAsync(long studentId, long mentorId);
         Task<(IEnumerable<Request> Items, int TotalCount)> GetPagedWithFiltersAsync(
             int pageNumber,
             int pageSize,

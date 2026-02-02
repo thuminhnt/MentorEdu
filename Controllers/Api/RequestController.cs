@@ -148,6 +148,56 @@ namespace MentorEdu.Controllers.Api
             return Ok(ApiResponse.SuccessResponse(result.Message));
         }
 
+        /// <summary>
+        /// Get requests received by mentor
+        /// </summary>
+        [HttpGet("received")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<PagedResponse<RequestListDto>>>> GetReceivedRequests(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            var userId = GetCurrentUserId();
+            var result = await _requestService.GetReceivedRequestsAsync(userId, pageNumber, pageSize);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<RequestListDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<RequestListDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Accept a request (mentor only)
+        /// </summary>
+        [HttpPost("{requestId}/accept")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<AcceptRequestResultDto>>> AcceptRequest(long requestId)
+        {
+            var userId = GetCurrentUserId();
+            var result = await _requestService.AcceptRequestAsync(requestId, userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<AcceptRequestResultDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<AcceptRequestResultDto>.SuccessResponse(result.Data!, result.Message));
+        }
+
+        /// <summary>
+        /// Reject a request (mentor only)
+        /// </summary>
+        [HttpPost("{requestId}/reject")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse>> RejectRequest(long requestId, [FromBody] RejectRequestDto? request = null)
+        {
+            var userId = GetCurrentUserId();
+            var result = await _requestService.RejectRequestAsync(requestId, userId, request?.Reason);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
         private long GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

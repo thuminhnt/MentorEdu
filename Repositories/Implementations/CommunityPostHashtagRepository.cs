@@ -11,7 +11,7 @@ namespace MentorEdu.Repositories.Implementations
         {
         }
 
-        public IQueryable<CommunityPostHashtag> Query()
+        public new IQueryable<CommunityPostHashtag> Query()
         {
             return _dbSet.Include(cph => cph.Hashtag);
         }

@@ -19,8 +19,14 @@ namespace MentorEdu.Models
         [Column("order_id")]
         public long? OrderId { get; set; }
 
+        [Column("review_id")]
+        public long? ReviewId { get; set; }
+
         [Column("reason")]
         public string? Reason { get; set; }
+
+        [Column("details")]
+        public string? Details { get; set; }
 
         [MaxLength(50)]
         [Column("status")]
@@ -44,6 +50,9 @@ namespace MentorEdu.Models
 
         [ForeignKey("OrderId")]
         public virtual Order? Order { get; set; }
+
+        [ForeignKey("ReviewId")]
+        public virtual Review? Review { get; set; }
 
         [ForeignKey("HandledBy")]
         public virtual User? Handler { get; set; }
