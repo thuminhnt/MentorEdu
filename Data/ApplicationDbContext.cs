@@ -38,6 +38,9 @@ namespace MentorEdu.Data
         public DbSet<Conversation> Conversations { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<MessageFile> MessageFiles { get; set; }
+        public DbSet<Group> Groups { get; set; }
+        public DbSet<GroupMember> GroupMembers { get; set; }
+        public DbSet<GroupMessage> GroupMessages { get; set; }
 
         // Wallet & Payment
         public DbSet<Wallet> Wallets { get; set; }
@@ -85,6 +88,9 @@ namespace MentorEdu.Data
             modelBuilder.Entity<Conversation>().ToTable("conversations");
             modelBuilder.Entity<Message>().ToTable("messages");
             modelBuilder.Entity<MessageFile>().ToTable("message_files");
+            modelBuilder.Entity<Group>().ToTable("groups");
+            modelBuilder.Entity<GroupMember>().ToTable("group_members");
+            modelBuilder.Entity<GroupMessage>().ToTable("group_messages");
 
             modelBuilder.Entity<Wallet>().ToTable("wallets");
             modelBuilder.Entity<Transaction>().ToTable("transactions");
@@ -476,6 +482,56 @@ namespace MentorEdu.Data
                 .Property(ws => ws.Status)
                 .HasConversion<string>()
                 .HasMaxLength(20);
+
+            // Group Configurations
+            modelBuilder.Entity<Group>()
+                .HasIndex(g => g.InviteCode)
+                .IsUnique();
+
+            modelBuilder.Entity<Group>()
+                .HasOne(g => g.Mentor)
+                .WithMany()
+                .HasForeignKey(g => g.MentorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GroupMessage>()
+                .HasOne(gm => gm.Group)
+                .WithMany(g => g.Messages)
+                .HasForeignKey(gm => gm.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupMessage>()
+                .HasOne(gm => gm.Sender)
+                .WithMany()
+                .HasForeignKey(gm => gm.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<GroupMessage>()
+                .Property(m => m.MessageType)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<GroupMessage>()
+                .Property(m => m.MessageType)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<GroupMember>()
+                .HasIndex(gm => new { gm.GroupId, gm.UserId })
+                .IsUnique();
+
+            modelBuilder.Entity<GroupMember>()
+                .HasOne(gm => gm.Group)
+                .WithMany(g => g.Members)
+                .HasForeignKey(gm => gm.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<GroupMember>()
+                .HasOne(gm => gm.User)
+                .WithMany()
+                .HasForeignKey(gm => gm.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
 
             modelBuilder.Entity<Message>()
                 .Property(m => m.MessageType)

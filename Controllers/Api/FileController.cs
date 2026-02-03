@@ -12,6 +12,10 @@ namespace MentorEdu.Controllers.Api
         private const long MaxFileSize = 20 * 1024 * 1024; // 20MB
         private const int MaxFiles = 2;
         private readonly string[] AllowedExtensions = { ".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx" };
+        private const long MaxChatImageSize = 10 * 1024 * 1024; // 10MB
+        private readonly string[] ChatAllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx" };
+        private const long MaxChatFileSize = 20 * 1024 * 1024; // 20MB
+        private const int MaxChatFiles = 5;
 
         public FileController(IWebHostEnvironment environment)
         {
@@ -92,7 +96,7 @@ namespace MentorEdu.Controllers.Api
                 Errors = errors
             };
 
-            return Ok(ApiResponse<UploadResult>.SuccessResponse(result, 
+            return Ok(ApiResponse<UploadResult>.SuccessResponse(result,
                 $"{uploadedUrls.Count} file(s) uploaded successfully"));
         }
 
@@ -112,7 +116,7 @@ namespace MentorEdu.Controllers.Api
 
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-            
+
             if (!imageExtensions.Contains(extension))
                 return BadRequest(ApiResponse<UploadResult>.FailResponse("Only image files are allowed"));
 
@@ -143,7 +147,144 @@ namespace MentorEdu.Controllers.Api
             {
                 return StatusCode(500, ApiResponse<UploadResult>.FailResponse($"Upload failed: {ex.Message}"));
             }
+
+
         }
+
+        /// <summary>
+        /// Upload chat image (max 10MB)
+        /// </summary>
+        [HttpPost("upload/chat-image")]
+        [Authorize]
+        [RequestSizeLimit(15 * 1024 * 1024)]
+        public async Task<ActionResult<ApiResponse<UploadResult>>> UploadChatImage(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("No file provided"));
+
+            if (file.Length > MaxChatImageSize)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("File size exceeds 10MB limit"));
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+
+            if (!imageExtensions.Contains(extension))
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("Only image files are allowed"));
+
+            try
+            {
+                var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "chat-images");
+                if (!Directory.Exists(uploadPath))
+                    Directory.CreateDirectory(uploadPath);
+
+                var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                var filePath = Path.Combine(uploadPath, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                var fileUrl = $"/uploads/chat-images/{uniqueFileName}";
+
+                var result = new UploadResult
+                {
+                    FileUrls = new List<string> { fileUrl }
+                };
+
+                return Ok(ApiResponse<UploadResult>.SuccessResponse(result, "Chat image uploaded successfully"));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<UploadResult>.FailResponse($"Upload failed: {ex.Message}"));
+            }
+        }
+
+        /// <summary>
+        /// Upload chat files (images and documents) in a single request (max 20MB each, 5 files)
+        /// </summary>
+        [HttpPost("upload/chat-files")]
+        [Authorize]
+        [RequestSizeLimit(120 * 1024 * 1024)]
+        public async Task<ActionResult<ApiResponse<UploadResult>>> UploadChatFiles([FromForm] List<IFormFile> files)
+        {
+            var allowedExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+                    ".ppt", ".pptx", ".txt", ".zip", ".rar", ".7z",
+                    ".png", ".jpg", ".jpeg", ".gif", ".webp"
+                };
+
+            foreach (var f in files)
+            {
+                var ext = Path.GetExtension(f.FileName);
+                if (string.IsNullOrWhiteSpace(ext) || !allowedExts.Contains(ext))
+                    return BadRequest(ApiResponse<object>.FailResponse($"File type not allowed: {ext}"));
+            }
+            if (files == null || files.Count == 0)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("No files provided"));
+
+            if (files.Count > MaxChatFiles)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse($"Maximum {MaxChatFiles} files allowed"));
+
+            var uploadedUrls = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var file in files)
+            {
+                if (file.Length > MaxChatFileSize)
+                {
+                    errors.Add($"{file.FileName}: File size exceeds 20MB limit");
+                    continue;
+                }
+
+                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                if (!ChatAllowedExtensions.Contains(extension))
+                {
+                    errors.Add($"{file.FileName}: Invalid file type. Allowed: {string.Join(", ", ChatAllowedExtensions)}");
+                    continue;
+                }
+
+                try
+                {
+                    var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "chat-files");
+                    if (!Directory.Exists(uploadPath))
+                        Directory.CreateDirectory(uploadPath);
+
+                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                    var filePath = Path.Combine(uploadPath, uniqueFileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    var fileUrl = $"/uploads/chat-files/{uniqueFileName}";
+                    uploadedUrls.Add(fileUrl);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{file.FileName}: Upload failed - {ex.Message}");
+                }
+            }
+
+            if (uploadedUrls.Count == 0)
+            {
+                return BadRequest(ApiResponse<UploadResult>.FailResponse(
+                    $"No files were uploaded. Errors: {string.Join("; ", errors)}"
+                ));
+            }
+
+            var result = new UploadResult
+            {
+                FileUrls = uploadedUrls,
+                Errors = errors
+            };
+
+            return Ok(ApiResponse<UploadResult>.SuccessResponse(result,
+                $"{uploadedUrls.Count} file(s) uploaded successfully"));
+        }
+
     }
 
     public class UploadResult
