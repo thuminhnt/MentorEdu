@@ -48,5 +48,17 @@ namespace MentorEdu.DTOs.User
         /// Additional notes for the application (optional)
         /// </summary>
         public string? ApplicationNote { get; set; }
+
+        /// <summary>
+        /// List of category IDs that mentor specializes in (REQUIRED - at least 1)
+        /// </summary>
+        [Required(ErrorMessage = "Please select at least one category")]
+        [MinLength(1, ErrorMessage = "Please select at least one category")]
+        public List<long> CategoryIds { get; set; } = new();
+
+        /// <summary>
+        /// List of hashtag IDs for more specific expertise (optional)
+        /// </summary>
+        public List<long>? HashtagIds { get; set; }
     }
 }

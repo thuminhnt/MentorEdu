@@ -16,6 +16,11 @@ namespace MentorEdu.Services.Interfaces
         // Student specific
         Task<ServiceResult<PagedResponse<RequestListDto>>> GetMyRequestsAsync(long studentId, int pageNumber, int pageSize);
         
+        // Mentor specific
+        Task<ServiceResult<PagedResponse<RequestListDto>>> GetReceivedRequestsAsync(long mentorId, int pageNumber, int pageSize);
+        Task<ServiceResult<AcceptRequestResultDto>> AcceptRequestAsync(long requestId, long mentorId);
+        Task<ServiceResult> RejectRequestAsync(long requestId, long mentorId, string? reason);
+        
         // Status management
         Task<ServiceResult> CloseRequestAsync(long requestId, long userId);
         

@@ -54,6 +54,11 @@ namespace MentorEdu.Data
         // Community
         public DbSet<CommunityPost> CommunityPosts { get; set; }
         public DbSet<CommunityComment> CommunityComments { get; set; }
+        public DbSet<CommunityPostHashtag> CommunityPostHashtags { get; set; }
+        public DbSet<CommunityPostFile> CommunityPostFiles { get; set; }
+
+        // Follow
+        public DbSet<UserFollow> UserFollows { get; set; }
 
         // Verification Tokens
         public DbSet<VerificationToken> VerificationTokens { get; set; }
@@ -101,6 +106,9 @@ namespace MentorEdu.Data
 
             modelBuilder.Entity<CommunityPost>().ToTable("community_posts");
             modelBuilder.Entity<CommunityComment>().ToTable("community_comments");
+            modelBuilder.Entity<CommunityPostHashtag>().ToTable("community_post_hashtags");
+            modelBuilder.Entity<CommunityPostFile>().ToTable("community_post_files");
+            modelBuilder.Entity<UserFollow>().ToTable("user_follows");
             modelBuilder.Entity<VerificationToken>().ToTable("verification_tokens");
             modelBuilder.Entity<MentorApplicationHistory>().ToTable("mentor_application_history");
 
@@ -279,12 +287,7 @@ namespace MentorEdu.Data
                 .HasIndex(h => h.Name)
                 .IsUnique();
 
-            // Category - Self-referencing
-            modelBuilder.Entity<Category>()
-                .HasOne(c => c.Parent)
-                .WithMany(c => c.Children)
-                .HasForeignKey(c => c.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
+
 
             // Request
             modelBuilder.Entity<Request>()
@@ -304,7 +307,15 @@ namespace MentorEdu.Data
                 .HasOne(p => p.Request)
                 .WithMany(r => r.Proposals)
                 .HasForeignKey(p => p.RequestId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Proposal>()
+                .HasOne(p => p.Post)
+                .WithMany(cp => cp.Proposals)
+                .HasForeignKey(p => p.PostId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Order - Multiple FKs to User
             modelBuilder.Entity<Order>()
@@ -414,6 +425,35 @@ namespace MentorEdu.Data
                 .HasForeignKey(cp => cp.AuthorId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<CommunityPost>()
+                .HasOne(cp => cp.Category)
+                .WithMany()
+                .HasForeignKey(cp => cp.CategoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // CommunityPostHashtag - Composite Key
+            modelBuilder.Entity<CommunityPostHashtag>()
+                .HasKey(cph => new { cph.PostId, cph.HashtagId });
+
+            modelBuilder.Entity<CommunityPostHashtag>()
+                .HasOne(cph => cph.Post)
+                .WithMany(p => p.PostHashtags)
+                .HasForeignKey(cph => cph.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CommunityPostHashtag>()
+                .HasOne(cph => cph.Hashtag)
+                .WithMany(h => h.CommunityPostHashtags)
+                .HasForeignKey(cph => cph.HashtagId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // CommunityPostFile
+            modelBuilder.Entity<CommunityPostFile>()
+                .HasOne(cpf => cpf.Post)
+                .WithMany(p => p.Files)
+                .HasForeignKey(cpf => cpf.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // CommunityComment
             modelBuilder.Entity<CommunityComment>()
                 .HasOne(cc => cc.Author)
@@ -426,6 +466,23 @@ namespace MentorEdu.Data
                 .WithMany(cp => cp.Comments)
                 .HasForeignKey(cc => cc.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // UserFollow
+            modelBuilder.Entity<UserFollow>()
+                .HasOne(uf => uf.Follower)
+                .WithMany(u => u.Following)
+                .HasForeignKey(uf => uf.FollowerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserFollow>()
+                .HasOne(uf => uf.Following)
+                .WithMany(u => u.Followers)
+                .HasForeignKey(uf => uf.FollowingId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<UserFollow>()
+                .HasIndex(uf => new { uf.FollowerId, uf.FollowingId })
+                .IsUnique();
 
             // OrderDetail
             modelBuilder.Entity<OrderDetail>()

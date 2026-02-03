@@ -229,6 +229,7 @@ namespace MentorEdu.Services.Implementations
                 Rating = r.Rating,
                 Comment = r.Comment,
                 CreatedAt = r.CreatedAt,
+                StudentId = r.FromUserId,
                 StudentName = r.FromUser?.UserProfile?.FullName,
                 StudentAvatar = r.FromUser?.UserProfile?.AvatarUrl,
                 OrderTitle = r.Order?.Request?.Title
@@ -284,9 +285,8 @@ namespace MentorEdu.Services.Implementations
             // Get submission count for history
             var submissionCount = await _unitOfWork.MentorApplicationHistories.GetSubmissionCountAsync(userId) + 1;
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            // Use ExecuteWithStrategyAsync to properly handle transactions with retry strategy
+            await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 // If rejected before, update the existing profile
                 if (existingProfile != null && existingProfile.ApprovalStatus == MentorApprovalStatus.Rejected)
@@ -303,6 +303,18 @@ namespace MentorEdu.Services.Implementations
                     existingProfile.ReviewedBy = null;
                     existingProfile.UpdatedAt = DateTime.UtcNow;
                     _unitOfWork.MentorProfiles.Update(existingProfile);
+
+                    // Update categories - remove old and add new
+                    var existingCategories = await _unitOfWork.MentorCategories.Query()
+                        .Where(mc => mc.MentorId == userId).ToListAsync();
+                    foreach (var cat in existingCategories)
+                        _unitOfWork.MentorCategories.Remove(cat);
+
+                    // Update hashtags - remove old and add new
+                    var existingHashtags = await _unitOfWork.MentorHashtags.Query()
+                        .Where(mh => mh.MentorId == userId).ToListAsync();
+                    foreach (var hash in existingHashtags)
+                        _unitOfWork.MentorHashtags.Remove(hash);
                 }
                 else
                 {
@@ -326,6 +338,34 @@ namespace MentorEdu.Services.Implementations
                     await _unitOfWork.MentorProfiles.AddAsync(mentorProfile);
                 }
 
+                // Add new mentor categories
+                if (request.CategoryIds != null && request.CategoryIds.Any())
+                {
+                    foreach (var catId in request.CategoryIds.Distinct())
+                    {
+                        var mentorCategory = new MentorCategory
+                        {
+                            MentorId = userId,
+                            CategoryId = catId
+                        };
+                        await _unitOfWork.MentorCategories.AddAsync(mentorCategory);
+                    }
+                }
+
+                // Add new mentor hashtags (optional)
+                if (request.HashtagIds != null && request.HashtagIds.Any())
+                {
+                    foreach (var hashId in request.HashtagIds.Distinct())
+                    {
+                        var mentorHashtag = new MentorHashtag
+                        {
+                            MentorId = userId,
+                            HashtagId = hashId
+                        };
+                        await _unitOfWork.MentorHashtags.AddAsync(mentorHashtag);
+                    }
+                }
+
                 // Record history for audit trail and ML training
                 var applicationSnapshot = JsonSerializer.Serialize(new
                 {
@@ -333,7 +373,9 @@ namespace MentorEdu.Services.Implementations
                     request.ExperienceYears,
                     request.Introduction,
                     request.PortfolioUrl,
-                    request.ApplicationNote
+                    request.ApplicationNote,
+                    request.CategoryIds,
+                    request.HashtagIds
                 });
 
                 var history = new MentorApplicationHistory
@@ -361,15 +403,9 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Notifications.AddAsync(notification);
 
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
+            });
 
-                return ServiceResult.SuccessResult("Mentor application submitted successfully. Please wait for admin review.");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            return ServiceResult.SuccessResult("Mentor application submitted successfully. Please wait for admin review.");
         }
 
         public async Task<ServiceResult<MentorApplicationStatusDto>> GetApplicationStatusAsync(long userId)

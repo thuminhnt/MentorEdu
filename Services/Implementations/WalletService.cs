@@ -163,9 +163,7 @@ namespace MentorEdu.Services.Implementations
             if (availableBalance < request.Amount)
                 return ServiceResult.FailResult($"Insufficient available balance. Current balance: {availableBalance:N0} VND");
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 // Lock the amount
                 wallet.LockedBalance += request.Amount;
@@ -188,18 +186,12 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.Transactions.AddAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 // TODO: Process withdrawal (manually or via API)
                 // TODO: Send notification to admin and user
 
                 return ServiceResult.SuccessResult("Withdrawal request submitted. Please allow 1-3 business days for processing.");
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult<PagedResponse<TransactionDto>>> GetTransactionsAsync(long userId, SearchTransactionDto searchDto)

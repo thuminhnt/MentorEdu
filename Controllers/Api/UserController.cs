@@ -1,4 +1,5 @@
 using MentorEdu.DTOs.Common;
+using MentorEdu.DTOs.Report;
 using MentorEdu.DTOs.User;
 using MentorEdu.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -162,6 +163,24 @@ namespace MentorEdu.Controllers.Api
                 return StatusCode(result.StatusCode, ApiResponse<MentorApplicationStatusDto>.FailResponse(result.Message ?? ""));
 
             return Ok(ApiResponse<MentorApplicationStatusDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Create a report (report a user or review)
+        /// </summary>
+        [HttpPost("reports")]
+        public async Task<ActionResult<ApiResponse<ReportDto>>> CreateReport([FromBody] CreateReportDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse<ReportDto>.FailResponse("Invalid request data"));
+
+            var userId = GetCurrentUserId();
+            var result = await _userService.CreateReportAsync(userId, request);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<ReportDto>.FailResponse(result.Message ?? ""));
+
+            return StatusCode(201, ApiResponse<ReportDto>.SuccessResponse(result.Data!, result.Message));
         }
 
         private long GetCurrentUserId()

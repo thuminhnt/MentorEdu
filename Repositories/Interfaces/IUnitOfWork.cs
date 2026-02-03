@@ -14,6 +14,8 @@ namespace MentorEdu.Repositories.Interfaces
         ICategoryRepository Categories { get; }
         IHashtagRepository Hashtags { get; }
         ICategoryHashtagRepository CategoryHashtags { get; }
+        IMentorCategoryRepository MentorCategories { get; }
+        IMentorHashtagRepository MentorHashtags { get; }
 
         // Request, Proposal, Order
         IRequestRepository Requests { get; }
@@ -41,6 +43,11 @@ namespace MentorEdu.Repositories.Interfaces
         // Community
         ICommunityPostRepository CommunityPosts { get; }
         ICommunityCommentRepository CommunityComments { get; }
+        ICommunityPostHashtagRepository CommunityPostHashtags { get; }
+        ICommunityPostFileRepository CommunityPostFiles { get; }
+
+        // Follow
+        IUserFollowRepository UserFollows { get; }
 
         // Notification
         INotificationRepository Notifications { get; }
@@ -53,5 +60,16 @@ namespace MentorEdu.Repositories.Interfaces
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();
+        
+        /// <summary>
+        /// Execute operation with execution strategy for retry-on-failure support
+        /// Use this instead of BeginTransactionAsync when EnableRetryOnFailure is enabled
+        /// </summary>
+        Task ExecuteWithStrategyAsync(Func<Task> operation);
+        
+        /// <summary>
+        /// Execute operation with execution strategy and return result
+        /// </summary>
+        Task<T> ExecuteWithStrategyAsync<T>(Func<Task<T>> operation);
     }
 }

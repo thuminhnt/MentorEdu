@@ -1,10 +1,12 @@
 using MentorEdu.DTOs.Common;
+using MentorEdu.DTOs.Report;
 using MentorEdu.DTOs.User;
 using MentorEdu.Models;
 using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace MentorEdu.Services.Implementations
 {
@@ -64,7 +66,11 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult<UserDetailDto>> UpdateMentorProfileAsync(long userId, UpdateMentorProfileRequest request)
         {
-            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            var user = await _unitOfWork.Users.Query()
+                .Include(u => u.MentorCategories)
+                .Include(u => u.MentorHashtags)
+                .Include(u => u.MentorProfile)
+                .FirstOrDefaultAsync(u => u.Id == userId);
             
             if (user == null)
                 return ServiceResult<UserDetailDto>.NotFoundResult("User not found");
@@ -72,7 +78,7 @@ namespace MentorEdu.Services.Implementations
             if (user.Role != UserRole.Mentor)
                 return ServiceResult<UserDetailDto>.FailResult("Only mentors can update this information");
 
-            var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(userId);
+            var mentorProfile = user.MentorProfile;
             
             if (mentorProfile == null)
             {
@@ -83,6 +89,7 @@ namespace MentorEdu.Services.Implementations
                     RatingCount = 0,
                     CreatedAt = DateTime.UtcNow
                 };
+                user.MentorProfile = mentorProfile;
                 await _unitOfWork.MentorProfiles.AddAsync(mentorProfile);
             }
 
@@ -98,16 +105,17 @@ namespace MentorEdu.Services.Implementations
             // Update categories
             if (request.CategoryIds != null && request.CategoryIds.Any())
             {
-                // Remove old categories
-                var existingCategories = await _unitOfWork.Categories
-                    .FindAsync(c => user.MentorCategories.Select(mc => mc.CategoryId).Contains(c.Id));
-                
-                user.MentorCategories.Clear();
+                // Remove old categories properly
+                var oldCategories = user.MentorCategories.ToList();
+                foreach (var oldCat in oldCategories)
+                {
+                    _unitOfWork.MentorCategories.Remove(oldCat);
+                }
                 
                 // Add new categories
                 foreach (var categoryId in request.CategoryIds)
                 {
-                    user.MentorCategories.Add(new MentorCategory
+                    await _unitOfWork.MentorCategories.AddAsync(new MentorCategory
                     {
                         MentorId = userId,
                         CategoryId = categoryId
@@ -118,11 +126,17 @@ namespace MentorEdu.Services.Implementations
             // Update hashtags
             if (request.HashtagIds != null && request.HashtagIds.Any())
             {
-                user.MentorHashtags.Clear();
+                // Remove old hashtags properly
+                var oldHashtags = user.MentorHashtags.ToList();
+                foreach (var oldTag in oldHashtags)
+                {
+                    _unitOfWork.MentorHashtags.Remove(oldTag);
+                }
                 
+                // Add new hashtags
                 foreach (var hashtagId in request.HashtagIds)
                 {
-                    user.MentorHashtags.Add(new MentorHashtag
+                    await _unitOfWork.MentorHashtags.AddAsync(new MentorHashtag
                     {
                         MentorId = userId,
                         HashtagId = hashtagId
@@ -393,6 +407,74 @@ namespace MentorEdu.Services.Implementations
             }
 
             return dto;
+        }
+
+        #endregion
+
+        #region Report
+
+        public async Task<ServiceResult<ReportDto>> CreateReportAsync(long reporterId, CreateReportDto request)
+        {
+            // Validate reported user exists
+            var reportedUser = await _unitOfWork.Users.GetByIdAsync(request.ReportedUserId);
+            if (reportedUser == null)
+                return ServiceResult<ReportDto>.NotFoundResult("Reported user not found");
+
+            // Cannot report yourself
+            if (reporterId == request.ReportedUserId)
+                return ServiceResult<ReportDto>.FailResult("You cannot report yourself");
+
+            // Check order if provided
+            if (request.OrderId.HasValue)
+            {
+                var order = await _unitOfWork.Orders.GetByIdAsync(request.OrderId.Value);
+                if (order == null)
+                    return ServiceResult<ReportDto>.NotFoundResult("Order not found");
+
+                // Check if user is part of the order
+                if (order.StudentId != reporterId && order.MentorId != reporterId)
+                    return ServiceResult<ReportDto>.ForbiddenResult("You are not part of this order");
+            }
+
+            // Check review if provided
+            if (request.ReviewId.HasValue)
+            {
+                var review = await _unitOfWork.Reviews.GetByIdAsync(request.ReviewId.Value);
+                if (review == null)
+                    return ServiceResult<ReportDto>.NotFoundResult("Review not found");
+            }
+
+            var report = new Report
+            {
+                ReporterId = reporterId,
+                ReportedUserId = request.ReportedUserId,
+                OrderId = request.OrderId,
+                ReviewId = request.ReviewId,
+                Reason = request.Reason,
+                Details = request.Details,
+                Status = "pending",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Reports.AddAsync(report);
+            await _unitOfWork.SaveChangesAsync();
+
+            var reporter = await _unitOfWork.Users.GetByIdWithProfilesAsync(reporterId);
+
+            var dto = new ReportDto
+            {
+                Id = report.Id,
+                Reason = report.Reason,
+                Status = report.Status,
+                CreatedAt = report.CreatedAt,
+                ReporterId = report.ReporterId,
+                ReporterName = reporter?.UserProfile?.FullName,
+                ReportedUserId = report.ReportedUserId,
+                ReportedUserName = reportedUser?.UserProfile?.FullName,
+                OrderId = report.OrderId
+            };
+
+            return ServiceResult<ReportDto>.CreatedResult(dto, "Report submitted successfully");
         }
 
         #endregion

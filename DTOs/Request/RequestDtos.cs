@@ -25,6 +25,7 @@ namespace MentorEdu.DTOs.Request
         public long StudentId { get; set; }
         public string? StudentName { get; set; }
         public string? StudentAvatar { get; set; }
+
     }
 
     /// <summary>
@@ -56,7 +57,7 @@ namespace MentorEdu.DTOs.Request
     /// Create Request DTO
     /// </summary>
     public class CreateRequestDto
-    {
+    {        public long? MentorId { get; set; }
         [Required(ErrorMessage = "Title is required")]
         [MaxLength(255)]
         public string Title { get; set; } = string.Empty;
@@ -108,5 +109,23 @@ namespace MentorEdu.DTOs.Request
         public int PageSize { get; set; } = 10;
         public string? SortBy { get; set; } = "createdAt";
         public bool SortDescending { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Result DTO for accepting a request
+    /// </summary>
+    public class AcceptRequestResultDto
+    {
+        public long RequestId { get; set; }
+        public long ConversationId { get; set; }
+        public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Reject Request DTO
+    /// </summary>
+    public class RejectRequestDto
+    {
+        public string? Reason { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 using MentorEdu.DTOs.Common;
+using MentorEdu.DTOs.Report;
 using MentorEdu.DTOs.User;
 using MentorEdu.Services.Common;
 
@@ -27,5 +28,8 @@ namespace MentorEdu.Services.Interfaces
         // Account management
         Task<ServiceResult> DeactivateAccountAsync(long userId);
         Task<ServiceResult> DeleteAccountAsync(long userId);
+        
+        // Report
+        Task<ServiceResult<ReportDto>> CreateReportAsync(long reporterId, CreateReportDto request);
     }
 }

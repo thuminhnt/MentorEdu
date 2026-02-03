@@ -100,32 +100,24 @@ namespace MentorEdu.Services.Implementations
         }
 
         /// <summary>
-        /// Notify mentors with matching specializations when a post contains relevant hashtags.
-        /// Flow: Post hashtags → CategoryHashtag mapping → Category → MentorCategory → Mentor → Notification
+        /// Notify mentors with matching specializations when a post contains relevant category or hashtags.
+        /// Flow: CategoryId/Hashtags → MentorCategory/MentorHashtag → Mentor → Notification
         /// </summary>
-        public async Task<ServiceResult> NotifyMentorsAboutRelevantPostAsync(long postId, List<string> hashtags)
+        public async Task<ServiceResult> NotifyMentorsAboutRelevantPostAsync(long postId, long? categoryId, List<string> hashtags)
         {
-            if (hashtags == null || !hashtags.Any())
-                return ServiceResult.SuccessResult("No hashtags provided");
-
             // Get post details
             var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postId);
             if (post == null)
                 return ServiceResult.NotFoundResult("Post not found");
 
-            // Step 1: Find category IDs mapped to these hashtags
-            var categoryIds = await _unitOfWork.CategoryHashtags.GetCategoryIdsByHashtagNamesAsync(hashtags);
-            if (!categoryIds.Any())
-                return ServiceResult.SuccessResult("No matching categories found for hashtags");
-
-            // Step 2: Find mentors who have these categories as specializations
             var mentorIds = new HashSet<long>();
-            foreach (var categoryId in categoryIds)
+
+            // Step 1: Find mentors by CategoryId (direct match)
+            if (categoryId.HasValue)
             {
-                var mentorCategories = await _unitOfWork.MentorProfiles.GetMentorIdsByCategoryIdAsync(categoryId);
-                foreach (var mentorId in mentorCategories)
+                var mentorsByCategory = await _unitOfWork.MentorProfiles.GetMentorIdsByCategoryIdAsync(categoryId.Value);
+                foreach (var mentorId in mentorsByCategory)
                 {
-                    // Don't notify the post author
                     if (mentorId != post.AuthorId)
                     {
                         mentorIds.Add(mentorId);
@@ -133,13 +125,44 @@ namespace MentorEdu.Services.Implementations
                 }
             }
 
+            // Step 2: Find mentors by hashtags (via CategoryHashtag mapping)
+            if (hashtags != null && hashtags.Any())
+            {
+                var categoryIds = await _unitOfWork.CategoryHashtags.GetCategoryIdsByHashtagNamesAsync(hashtags);
+                foreach (var catId in categoryIds)
+                {
+                    var mentorsByHashtagCategory = await _unitOfWork.MentorProfiles.GetMentorIdsByCategoryIdAsync(catId);
+                    foreach (var mentorId in mentorsByHashtagCategory)
+                    {
+                        if (mentorId != post.AuthorId)
+                        {
+                            mentorIds.Add(mentorId);
+                        }
+                    }
+                }
+            }
+
             if (!mentorIds.Any())
                 return ServiceResult.SuccessResult("No mentors found with matching specializations");
 
-            // Step 3: Create notifications for each mentor
-            var hashtagsDisplay = string.Join(", ", hashtags.Take(3).Select(h => $"#{h}"));
-            if (hashtags.Count > 3) hashtagsDisplay += "...";
+            // Step 3: Build display text
+            var displayParts = new List<string>();
+            if (categoryId.HasValue)
+            {
+                var category = await _unitOfWork.Categories.GetByIdAsync(categoryId.Value);
+                if (category != null)
+                {
+                    displayParts.Add(category.Name);
+                }
+            }
+            if (hashtags != null && hashtags.Any())
+            {
+                displayParts.AddRange(hashtags.Take(2).Select(h => $"#{h}"));
+            }
+            var displayText = string.Join(", ", displayParts.Take(3));
+            if (displayParts.Count > 3) displayText += "...";
 
+            // Step 4: Create notifications for each mentor
             foreach (var mentorId in mentorIds)
             {
                 var notification = new Notification
@@ -147,8 +170,8 @@ namespace MentorEdu.Services.Implementations
                     UserId = mentorId,
                     Type = NotificationType.RelevantPost,
                     Title = "New relevant post in your expertise area",
-                    Body = $"A new post about {hashtagsDisplay} has been published that matches your specializations.",
-                    Data = System.Text.Json.JsonSerializer.Serialize(new { postId, hashtags }),
+                    Body = $"A new post about {displayText} has been published that matches your specializations.",
+                    Data = System.Text.Json.JsonSerializer.Serialize(new { postId, categoryId, hashtags }),
                     IsRead = false,
                     CreatedAt = DateTime.UtcNow
                 };

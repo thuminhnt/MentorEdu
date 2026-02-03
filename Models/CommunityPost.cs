@@ -13,6 +13,9 @@ namespace MentorEdu.Models
         [Column("author_id")]
         public long AuthorId { get; set; }
 
+        [Column("category_id")]
+        public long? CategoryId { get; set; }
+
         [MaxLength(255)]
         [Column("title")]
         public string? Title { get; set; }
@@ -30,6 +33,12 @@ namespace MentorEdu.Models
         [ForeignKey("AuthorId")]
         public virtual User Author { get; set; } = null!;
 
+        [ForeignKey("CategoryId")]
+        public virtual Category? Category { get; set; }
+
         public virtual ICollection<CommunityComment> Comments { get; set; } = new List<CommunityComment>();
+        public virtual ICollection<Proposal> Proposals { get; set; } = new List<Proposal>();
+        public virtual ICollection<CommunityPostHashtag> PostHashtags { get; set; } = new List<CommunityPostHashtag>();
+        public virtual ICollection<CommunityPostFile> Files { get; set; } = new List<CommunityPostFile>();
     }
 }

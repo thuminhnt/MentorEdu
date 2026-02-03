@@ -14,6 +14,9 @@ namespace MentorEdu.Models
         [Column("student_id")]
         public long StudentId { get; set; }
 
+        [Column("mentor_id")]
+        public long? MentorId { get; set; }
+
         [MaxLength(255)]
         [Column("title")]
         public string? Title { get; set; }
@@ -33,6 +36,9 @@ namespace MentorEdu.Models
         [Column("status")]
         public RequestStatus Status { get; set; }
 
+        [Column("reject_reason")]
+        public string? RejectReason { get; set; }
+
         [Column("created_at")]
         public DateTime? CreatedAt { get; set; }
 
@@ -42,6 +48,9 @@ namespace MentorEdu.Models
         // Navigation Properties
         [ForeignKey("StudentId")]
         public virtual User Student { get; set; } = null!;
+
+        [ForeignKey("MentorId")]
+        public virtual User? Mentor { get; set; }
 
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }

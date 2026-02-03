@@ -81,9 +81,7 @@ namespace MentorEdu.Services.Implementations
             if (await _unitOfWork.Users.EmailExistsAsync(request.Email))
                 return ServiceResult<LoginResponse>.FailResult("Email already exists");
 
-            await _unitOfWork.BeginTransactionAsync();
-
-            try
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 // Create user as Student
                 var user = new User
@@ -137,7 +135,6 @@ namespace MentorEdu.Services.Implementations
 
                 await _tokenRepository.AddAsync(verificationToken);
                 await _unitOfWork.SaveChangesAsync();
-                await _unitOfWork.CommitTransactionAsync();
 
                 // Send verification email (don't fail registration if email fails)
                 try
@@ -166,12 +163,7 @@ namespace MentorEdu.Services.Implementations
 
                 return ServiceResult<LoginResponse>.CreatedResult(response, 
                     "Registration successful. Please check your email to verify your account.");
-            }
-            catch (Exception)
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                throw;
-            }
+            });
         }
 
         public async Task<ServiceResult> LogoutAsync(long userId)
@@ -190,6 +182,10 @@ namespace MentorEdu.Services.Implementations
 
             if (!VerifyPassword(request.CurrentPassword, user.PasswordHash))
                 return ServiceResult.FailResult("Current password is incorrect");
+
+            // Check if new password is the same as current password
+            if (VerifyPassword(request.NewPassword, user.PasswordHash))
+                return ServiceResult.FailResult("New password cannot be the same as your current password");
 
             user.PasswordHash = HashPassword(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
@@ -248,6 +244,10 @@ namespace MentorEdu.Services.Implementations
             var user = tokenEntity.User;
             if (user == null)
                 return ServiceResult.FailResult("User not found");
+
+            // Check if new password is the same as current password
+            if (VerifyPassword(request.NewPassword, user.PasswordHash))
+                return ServiceResult.FailResult("New password cannot be the same as your current password");
 
             user.PasswordHash = HashPassword(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
@@ -475,9 +475,7 @@ namespace MentorEdu.Services.Implementations
             if (user == null)
             {
                 // Create new user from Google account - ALWAYS as Student
-                await _unitOfWork.BeginTransactionAsync();
-                
-                try
+                await _unitOfWork.ExecuteWithStrategyAsync(async () =>
                 {
                     user = new User
                     {
@@ -518,13 +516,7 @@ namespace MentorEdu.Services.Implementations
 
                     await _unitOfWork.Wallets.AddAsync(wallet);
                     await _unitOfWork.SaveChangesAsync();
-                    await _unitOfWork.CommitTransactionAsync();
-                }
-                catch (Exception)
-                {
-                    await _unitOfWork.RollbackTransactionAsync();
-                    throw;
-                }
+                });
             }
             else if (!user.IsActive)
             {
@@ -532,7 +524,8 @@ namespace MentorEdu.Services.Implementations
             }
 
             // Get user profile for full name and avatar
-            var profile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
+            // User is guaranteed to exist at this point (either found or created above)
+            var profile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user!.Id);
             
             // Get mentor status if exists
             MentorApprovalStatus? mentorStatus = null;
@@ -550,7 +543,7 @@ namespace MentorEdu.Services.Implementations
             {
                 UserId = user.Id,
                 Email = user.Email,
-                FullName = profile?.FullName ?? name,
+                FullName = profile?.FullName ?? name ?? "User",
                 Role = user.Role,
                 AvatarUrl = profile?.AvatarUrl ?? avatarUrl,
                 Token = token,

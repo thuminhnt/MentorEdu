@@ -11,14 +11,26 @@ namespace MentorEdu.Repositories.Implementations
         {
         }
 
+        public new IQueryable<CommunityPost> Query()
+        {
+            return _dbSet.AsQueryable();
+        }
+
         public async Task<CommunityPost?> GetByIdWithCommentsAsync(long id)
         {
             return await _dbSet
                 .Include(p => p.Author)
                     .ThenInclude(a => a.UserProfile)
+                .Include(p => p.Author)
+                    .ThenInclude(a => a.MentorProfile)
+                .Include(p => p.Category)
+                .Include(p => p.PostHashtags)
+                    .ThenInclude(ph => ph.Hashtag)
+                .Include(p => p.Files)
                 .Include(p => p.Comments)
                     .ThenInclude(c => c.Author)
                         .ThenInclude(a => a.UserProfile)
+                .Include(p => p.Proposals)
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
 
@@ -26,7 +38,14 @@ namespace MentorEdu.Repositories.Implementations
         {
             return await _dbSet
                 .Where(p => p.AuthorId == authorId)
+                .Include(p => p.Author)
+                    .ThenInclude(a => a.UserProfile)
+                .Include(p => p.Category)
+                .Include(p => p.PostHashtags)
+                    .ThenInclude(ph => ph.Hashtag)
+                .Include(p => p.Files)
                 .Include(p => p.Comments)
+                .Include(p => p.Proposals)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
         }
@@ -47,7 +66,43 @@ namespace MentorEdu.Repositories.Implementations
             var items = await query
                 .Include(p => p.Author)
                     .ThenInclude(a => a.UserProfile)
+                .Include(p => p.Category)
+                .Include(p => p.PostHashtags)
+                    .ThenInclude(ph => ph.Hashtag)
+                .Include(p => p.Files)
                 .Include(p => p.Comments)
+                .Include(p => p.Proposals)
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<(IEnumerable<CommunityPost> Items, int TotalCount)> GetPagedAsync(
+            int pageNumber,
+            int pageSize,
+            string? searchTerm,
+            List<long> authorIds)
+        {
+            var query = _dbSet.Where(p => authorIds.Contains(p.AuthorId));
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+                query = query.Where(p => p.Title!.Contains(searchTerm) || 
+                                        p.Content!.Contains(searchTerm));
+
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .Include(p => p.Author)
+                    .ThenInclude(a => a.UserProfile)
+                .Include(p => p.Category)
+                .Include(p => p.PostHashtags)
+                    .ThenInclude(ph => ph.Hashtag)
+                .Include(p => p.Files)
+                .Include(p => p.Comments)
+                .Include(p => p.Proposals)
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
@@ -61,7 +116,12 @@ namespace MentorEdu.Repositories.Implementations
             return await _dbSet
                 .Include(p => p.Author)
                     .ThenInclude(a => a.UserProfile)
+                .Include(p => p.Category)
+                .Include(p => p.PostHashtags)
+                    .ThenInclude(ph => ph.Hashtag)
+                .Include(p => p.Files)
                 .Include(p => p.Comments)
+                .Include(p => p.Proposals)
                 .OrderByDescending(p => p.CreatedAt)
                 .Take(count)
                 .ToListAsync();
