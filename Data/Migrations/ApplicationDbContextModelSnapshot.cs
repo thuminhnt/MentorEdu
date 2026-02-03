@@ -286,6 +286,129 @@ namespace MentorEdu.Data.Migrations
                     b.ToTable("escrows", (string)null);
                 });
 
+            modelBuilder.Entity("MentorEdu.Models.Group", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("InviteCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("invite_code");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_active");
+
+                    b.Property<long>("MentorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mentor_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InviteCode")
+                        .IsUnique();
+
+                    b.HasIndex("MentorId");
+
+                    b.ToTable("groups", (string)null);
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.GroupMember", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("joined_at");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int")
+                        .HasColumnName("role");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GroupId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("group_members", (string)null);
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.GroupMessage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Content")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("message_type");
+
+                    b.Property<long>("SenderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sender_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("group_messages", (string)null);
+                });
+
             modelBuilder.Entity("MentorEdu.Models.Hashtag", b =>
                 {
                     b.Property<long>("Id")
@@ -1686,6 +1809,55 @@ namespace MentorEdu.Data.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("MentorEdu.Models.Group", b =>
+                {
+                    b.HasOne("MentorEdu.Models.User", "Mentor")
+                        .WithMany()
+                        .HasForeignKey("MentorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Mentor");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.GroupMember", b =>
+                {
+                    b.HasOne("MentorEdu.Models.Group", "Group")
+                        .WithMany("Members")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MentorEdu.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.GroupMessage", b =>
+                {
+                    b.HasOne("MentorEdu.Models.Group", "Group")
+                        .WithMany("Messages")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MentorEdu.Models.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Sender");
+                });
+
             modelBuilder.Entity("MentorEdu.Models.MentorApplicationHistory", b =>
                 {
                     b.HasOne("MentorEdu.Models.User", "ActionPerformedBy")
@@ -2145,6 +2317,13 @@ namespace MentorEdu.Data.Migrations
 
             modelBuilder.Entity("MentorEdu.Models.Conversation", b =>
                 {
+                    b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.Group", b =>
+                {
+                    b.Navigation("Members");
+
                     b.Navigation("Messages");
                 });
 

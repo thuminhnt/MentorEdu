@@ -310,32 +310,26 @@ namespace MentorEdu.Controllers.Api
 
             foreach (var file in files)
             {
-                // Validate size (10MB)
-                if (file.Length > 10 * 1024 * 1024)
+                if (file.Length > MaxChatFileSize)
                 {
-                    errors.Add($"{file.FileName}: File size exceeds 10MB limit");
+                    errors.Add($"{file.FileName}: File size exceeds 20MB limit");
                     continue;
                 }
 
                 var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-                if (!allowedExts.Contains(extension))
+                if (!ChatAllowedExtensions.Contains(extension))
                 {
-                    errors.Add($"{file.FileName}: Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg, gif, webp");
+                    errors.Add($"{file.FileName}: Invalid file type. Allowed: {string.Join(", ", ChatAllowedExtensions)}");
                     continue;
                 }
 
                 try
                 {
-                    var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "community-posts");
+                    var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", "chat-files");
                     if (!Directory.Exists(uploadPath))
                         Directory.CreateDirectory(uploadPath);
 
-                    // Keep original filename but add GUID prefix for uniqueness
-                    var safeOriginalName = Path.GetFileNameWithoutExtension(file.FileName)
-                        .Replace(" ", "_")
-                        .Replace("/", "_")
-                        .Replace("\\", "_");
-                    var uniqueFileName = $"{Guid.NewGuid().ToString().Substring(0, 8)}_{safeOriginalName}{extension}";
+                    var uniqueFileName = $"{Guid.NewGuid()}{extension}";
                     var filePath = Path.Combine(uploadPath, uniqueFileName);
 
                     using (var stream = new FileStream(filePath, FileMode.Create))
@@ -343,7 +337,7 @@ namespace MentorEdu.Controllers.Api
                         await file.CopyToAsync(stream);
                     }
 
-                    var fileUrl = $"/uploads/community-posts/{uniqueFileName}";
+                    var fileUrl = $"/uploads/chat-files/{uniqueFileName}";
                     uploadedUrls.Add(fileUrl);
                 }
                 catch (Exception ex)

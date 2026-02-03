@@ -177,6 +177,9 @@ builder.Services.AddScoped<ICommunityCommentRepository, CommunityCommentReposito
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
 builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
+builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+builder.Services.AddScoped<IGroupMemberRepository, GroupMemberRepository>();
+builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
 // =======================
 // UNIT OF WORK
 // =======================
@@ -202,6 +205,7 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<ICommunityService, CommunityService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
 
 // =======================
 // APP

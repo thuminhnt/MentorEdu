@@ -1,4 +1,4 @@
-namespace MentorEdu.Services.Common
+﻿namespace MentorEdu.Services.Common
 {
     /// <summary>
     /// Service result wrapper
@@ -32,16 +32,13 @@ namespace MentorEdu.Services.Common
                 StatusCode = 201
             };
         }
-
+        // ✅ THÊM CÁI NÀY
         public static ServiceResult<T> FailResult(string message, int statusCode = 400)
-        {
-            return new ServiceResult<T>
-            {
-                Success = false,
-                Message = message,
-                StatusCode = statusCode
-            };
-        }
+            => new ServiceResult<T> { Success = false, Message = message, StatusCode = statusCode };
+
+        // ✅ THÊM Failure để hết lỗi compile
+        public static ServiceResult<T> Failure(string message, int statusCode = 400)
+            => new ServiceResult<T> { Success = false, Message = message, StatusCode = statusCode };
 
         public static ServiceResult<T> NotFoundResult(string message = "Data not found")
         {

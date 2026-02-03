@@ -14,6 +14,7 @@ namespace MentorEdu.Hubs
     {
         private readonly IChatService _chatService;
         private readonly IWorkSessionService _workSessionService;
+        private readonly IGroupService _groupService;
         private readonly ILogger<ChatHub> _logger;
 
         // Track connected users: userId -> connectionId
@@ -21,11 +22,12 @@ namespace MentorEdu.Hubs
         private static readonly object _lock = new();
         private static readonly Dictionary<string, PendingWorkAction> _pendingWorkActions = new();
         private static readonly object _pendingWorkActionsLock = new();
-        public ChatHub(IChatService chatService, IWorkSessionService workSessionService, ILogger<ChatHub> logger)
+        public ChatHub(IChatService chatService, IWorkSessionService workSessionService, IGroupService groupService, ILogger<ChatHub> logger)
         {
             _chatService = chatService;
             _logger = logger;
             _workSessionService = workSessionService;
+            _groupService = groupService;
         }
 
         /// <summary>
@@ -426,6 +428,260 @@ namespace MentorEdu.Hubs
                             return;
                         }
 
+        #region Group Chat Methods
+
+        /// <summary>
+        /// Join a group chat room
+        /// </summary>
+        public async Task JoinGroupRoom(long groupId)
+        {
+            var userId = GetCurrentUserId();
+
+            // Verify user has access to this group
+            var hasAccess = await _groupService.UserHasAccessToGroupAsync(userId, groupId);
+            if (!hasAccess.Success || !hasAccess.Data)
+            {
+                await Clients.Caller.SendAsync("Error", "You do not have access to this group");
+                return;
+            }
+
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"group_{groupId}");
+
+            _logger.LogInformation("User {UserId} joined group {GroupId}", userId, groupId);
+        }
+
+        /// <summary>
+        /// Leave a group chat room
+        /// </summary>
+        public async Task LeaveGroupRoom(long groupId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"group_{groupId}");
+
+            var userId = GetCurrentUserId();
+            _logger.LogInformation("User {UserId} left group {GroupId}", userId, groupId);
+        }
+
+        /// <summary>
+        /// Send a message to a group
+        /// </summary>
+        public async Task SendGroupMessage(SendGroupMessageRequest request)
+        {
+            var userId = GetCurrentUserId();
+
+            // Verify user has access
+            var hasAccess = await _groupService.UserHasAccessToGroupAsync(userId, request.GroupId);
+            if (!hasAccess.Success || !hasAccess.Data)
+            {
+                await Clients.Caller.SendAsync("Error", "You do not have permission to send messages in this group");
+                return;
+            }
+
+            // Save message to database
+            var result = await _groupService.SendGroupMessageAsync(userId, new DTOs.Groups.SendGroupMessageDto
+            {
+                GroupId = request.GroupId,
+                Content = request.Content,
+                MessageType = request.MessageType
+            });
+
+            if (result.Success && result.Data != null)
+            {
+                // Broadcast to all users in the group
+                await Clients.Group($"group_{request.GroupId}")
+                    .SendAsync("ReceiveGroupMessage", result.Data);
+
+                _logger.LogInformation("User {UserId} sent message to group {GroupId}", userId, request.GroupId);
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("Error", result.Message);
+            }
+        }
+
+        /// <summary>
+        /// Notify typing status in group
+        /// </summary>
+        public async Task GroupTyping(long groupId, bool isTyping)
+        {
+            var userId = GetCurrentUserId();
+
+            await Clients.OthersInGroup($"group_{groupId}")
+                .SendAsync("UserGroupTyping", new { UserId = userId, GroupId = groupId, IsTyping = isTyping });
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Request to start a work session
+        /// </summary>
+        public async Task RequestStartWork(long conversationId, long orderId, long mentorId, long studentId)
+        {
+            var userId = GetCurrentUserId();
+            if (!await _chatService.UserHasAccessToConversationAsync(userId, conversationId))
+            {
+                await Clients.Caller.SendAsync("Error", "You do not have access to this conversation");
+                return;
+            }
+
+            var conversation = await _chatService.GetConversationByIdAsync(conversationId);
+            if (!conversation.Success || conversation.Data == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Conversation not found");
+                return;
+            }
+
+            if (conversation.Data.Mentor?.Id != mentorId || conversation.Data.Student?.Id != studentId)
+            {
+                await Clients.Caller.SendAsync("Error", "Conversation participants do not match request");
+                return;
+            }
+
+            if (userId != mentorId && userId != studentId)
+            {
+                await Clients.Caller.SendAsync("Error", "Invalid requester");
+                return;
+            }
+
+            var targetUserId = userId == mentorId ? studentId : mentorId;
+            var requestId = Guid.NewGuid().ToString("N");
+            var pendingAction = new PendingWorkAction
+            {
+                RequestId = requestId,
+                ActionType = WorkActionType.Start,
+                ConversationId = conversationId,
+                OrderId = orderId,
+                SessionId = null,
+                RequestedByUserId = userId,
+                TargetUserId = targetUserId,
+                MentorId = mentorId,
+                StudentId = studentId,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            lock (_pendingWorkActionsLock)
+            {
+                _pendingWorkActions[requestId] = pendingAction;
+            }
+
+            await Clients.Group($"conversation_{conversationId}")
+                .SendAsync("WorkActionState", new
+                {
+                    requestId,
+                    actionType = pendingAction.ActionType.ToString(),
+                    status = "Waiting",
+                    conversationId,
+                    orderId
+                });
+
+            await SendToUser(targetUserId, "WorkActionPopup", new
+            {
+                requestId,
+                actionType = pendingAction.ActionType.ToString(),
+                conversationId,
+                orderId,
+                mentorId,
+                studentId,
+                requestedByUserId = userId
+            });
+
+            await Clients.Caller.SendAsync("WorkActionSent", new
+            {
+                requestId,
+                actionType = pendingAction.ActionType.ToString()
+            });
+        }
+
+        /// <summary>
+        /// Request to pause a work session
+        /// </summary>
+        public async Task RequestPauseWork(long conversationId, long sessionId)
+        {
+            await RequestWorkAction(conversationId, sessionId, WorkActionType.Pause);
+        }
+
+        /// <summary>
+        /// Request to end a work session
+        /// </summary>
+        public async Task RequestEndWork(long conversationId, long sessionId)
+        {
+            await RequestWorkAction(conversationId, sessionId, WorkActionType.End);
+        }
+
+        /// <summary>
+        /// Respond to a pending work action
+        /// </summary>
+        public async Task RespondWorkAction(string requestId, bool accept)
+        {
+            var userId = GetCurrentUserId();
+            PendingWorkAction? pendingAction;
+
+            lock (_pendingWorkActionsLock)
+            {
+                if (!_pendingWorkActions.TryGetValue(requestId, out pendingAction))
+                {
+                    pendingAction = null;
+                }
+                else
+                {
+                    _pendingWorkActions.Remove(requestId);
+                }
+            }
+
+            if (pendingAction == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Request not found or already handled");
+                return;
+            }
+
+            if (pendingAction.TargetUserId != userId)
+            {
+                await Clients.Caller.SendAsync("Error", "You are not allowed to respond to this request");
+                return;
+            }
+
+            if (!accept)
+            {
+                await SendToUser(pendingAction.RequestedByUserId, "WorkActionRejected", new
+                {
+                    requestId,
+                    actionType = pendingAction.ActionType.ToString(),
+                    conversationId = pendingAction.ConversationId
+                });
+
+                await Clients.Group($"conversation_{pendingAction.ConversationId}")
+                    .SendAsync("WorkActionState", new
+                    {
+                        requestId,
+                        actionType = pendingAction.ActionType.ToString(),
+                        status = "Rejected",
+                        conversationId = pendingAction.ConversationId
+                    });
+
+                return;
+            }
+
+            switch (pendingAction.ActionType)
+            {
+                case WorkActionType.Start:
+                    {
+                        if (!pendingAction.OrderId.HasValue || pendingAction.MentorId == null || pendingAction.StudentId == null)
+                        {
+                            await Clients.Caller.SendAsync("Error", "Missing session details");
+                            return;
+                        }
+
+                        var startResult = await _workSessionService.StartSessionAsync(
+                            pendingAction.OrderId.Value,
+                            pendingAction.MentorId.Value,
+                            pendingAction.StudentId.Value);
+
+                        if (!startResult.Success || startResult.Data == null)
+                        {
+                            await SendToUser(pendingAction.RequestedByUserId, "Error", startResult.Message ?? "Failed to start session");
+                            await Clients.Caller.SendAsync("Error", startResult.Message ?? "Failed to start session");
+                            return;
+                        }
+
                         await Clients.Group($"conversation_{pendingAction.ConversationId}")
                             .SendAsync("WorkSessionStarted", new
                             {
@@ -641,6 +897,13 @@ namespace MentorEdu.Hubs
         public long? MentorId { get; set; }
         public long? StudentId { get; set; }
         public DateTime CreatedAtUtc { get; set; }
+    }
+
+    public class SendGroupMessageRequest
+    {
+        public long GroupId { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public MentorEdu.Models.Enums.MessageType MessageType { get; set; } = MentorEdu.Models.Enums.MessageType.Text;
     }
 
     public enum WorkActionType
