@@ -30,9 +30,6 @@ namespace MentorEdu.Models
         [Column("expected_budget")]
         public decimal? ExpectedBudget { get; set; }
 
-        [Column("expected_hours")]
-        public decimal? ExpectedHours { get; set; }
-
         [Column("status")]
         public RequestStatus Status { get; set; }
 

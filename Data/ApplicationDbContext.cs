@@ -146,16 +146,8 @@ namespace MentorEdu.Data
                 .Property(p => p.Price)
                 .HasColumnType("decimal(18,2)");
 
-            modelBuilder.Entity<Proposal>()
-                .Property(p => p.EstimatedHours)
-                .HasColumnType("decimal(18,2)");
-
             modelBuilder.Entity<Request>()
                 .Property(r => r.ExpectedBudget)
-                .HasColumnType("decimal(18,2)");
-
-            modelBuilder.Entity<Request>()
-                .Property(r => r.ExpectedHours)
                 .HasColumnType("decimal(18,2)");
 
             modelBuilder.Entity<Transaction>()

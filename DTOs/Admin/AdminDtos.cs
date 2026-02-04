@@ -17,7 +17,6 @@ namespace MentorEdu.DTOs.Admin
         public string? CategoryName { get; set; }
         public long? CategoryId { get; set; }
         public decimal? ExpectedBudget { get; set; }
-        public decimal? ExpectedHours { get; set; }
         public RequestStatus Status { get; set; }
         public string StatusDisplay => Status.ToString();
         public DateTime? CreatedAt { get; set; }
@@ -59,7 +58,6 @@ namespace MentorEdu.DTOs.Admin
         public long RequestId { get; set; }
         public string? RequestTitle { get; set; }
         public decimal? Price { get; set; }
-        public decimal? EstimatedHours { get; set; }
         public string? Message { get; set; }
         public ProposalStatus Status { get; set; }
         public string StatusDisplay => Status.ToString();

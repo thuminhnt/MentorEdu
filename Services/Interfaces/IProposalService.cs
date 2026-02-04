@@ -14,7 +14,7 @@ namespace MentorEdu.Services.Interfaces
         
         // For students
         Task<ServiceResult<List<ProposalListDto>>> GetProposalsByRequestAsync(long requestId);
-        Task<ServiceResult> AcceptProposalAsync(long proposalId, long studentId);
+        Task<ServiceResult<AcceptProposalResultDto>> AcceptProposalAsync(long proposalId, long studentId);
         Task<ServiceResult> RejectProposalAsync(long proposalId, long studentId, string? reason = null);
         
         // For mentors

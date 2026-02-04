@@ -119,15 +119,15 @@ namespace MentorEdu.Controllers.Api
         /// Accept a proposal (student only)
         /// </summary>
         [HttpPost("{proposalId}/accept")]
-        public async Task<ActionResult<ApiResponse>> AcceptProposal(long proposalId)
+        public async Task<ActionResult<ApiResponse<AcceptProposalResultDto>>> AcceptProposal(long proposalId)
         {
             var userId = GetCurrentUserId();
             var result = await _proposalService.AcceptProposalAsync(proposalId, userId);
 
             if (!result.Success)
-                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+                return StatusCode(result.StatusCode, ApiResponse<AcceptProposalResultDto>.FailResponse(result.Message ?? ""));
 
-            return Ok(ApiResponse.SuccessResponse(result.Message));
+            return Ok(ApiResponse<AcceptProposalResultDto>.SuccessResponse(result.Data!, result.Message));
         }
 
         /// <summary>

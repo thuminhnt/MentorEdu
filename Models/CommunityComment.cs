@@ -22,11 +22,19 @@ namespace MentorEdu.Models
         [Column("created_at")]
         public DateTime? CreatedAt { get; set; }
 
+        [Column("parent_comment_id")]
+        public long? ParentCommentId { get; set; }
+
         // Navigation Properties
         [ForeignKey("PostId")]
         public virtual CommunityPost Post { get; set; } = null!;
 
         [ForeignKey("AuthorId")]
         public virtual User Author { get; set; } = null!;
+
+        [ForeignKey("ParentCommentId")]
+        public virtual CommunityComment? ParentComment { get; set; }
+
+        public virtual ICollection<CommunityComment> Replies { get; set; } = new List<CommunityComment>();
     }
 }

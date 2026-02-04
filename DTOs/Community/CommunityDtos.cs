@@ -125,6 +125,8 @@ namespace MentorEdu.DTOs.Community
         public string? AuthorName { get; set; }
         public string? AuthorAvatar { get; set; }
         public bool IsAuthorMentor { get; set; }
+        public long? ParentCommentId { get; set; }
+        public List<CommunityCommentDto>? Replies { get; set; }
     }
 
     public class CreateCommentDto
@@ -133,6 +135,8 @@ namespace MentorEdu.DTOs.Community
 
         [Required]
         public string Content { get; set; } = string.Empty;
+
+        public long? ParentCommentId { get; set; }
     }
 
     // === PROPOSAL DTOs ===
@@ -146,7 +150,6 @@ namespace MentorEdu.DTOs.Community
         public string? MentorAvatar { get; set; }
         public string? MentorTitle { get; set; }
         public decimal? Price { get; set; }
-        public decimal? EstimatedHours { get; set; }
         public string? Message { get; set; }
         public string Status { get; set; } = "Pending";
         public DateTime? CreatedAt { get; set; }
@@ -155,7 +158,6 @@ namespace MentorEdu.DTOs.Community
     public class SendProposalDto
     {
         public decimal? Price { get; set; }
-        public decimal? EstimatedHours { get; set; }
 
         [Required]
         public string Message { get; set; } = string.Empty;

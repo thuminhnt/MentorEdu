@@ -12,7 +12,7 @@ namespace MentorEdu.Models
         public long Id { get; set; }
 
         [Column("order_id")]
-        public long OrderId { get; set; }
+        public long? OrderId { get; set; }
 
         [Column("amount")]
         public decimal Amount { get; set; }
@@ -31,6 +31,6 @@ namespace MentorEdu.Models
 
         // Navigation Property
         [ForeignKey("OrderId")]
-        public virtual Order Order { get; set; } = null!;
+        public virtual Order? Order { get; set; }
     }
 }

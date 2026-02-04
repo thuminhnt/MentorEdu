@@ -23,9 +23,6 @@ namespace MentorEdu.Models
         [Column("price")]
         public decimal? Price { get; set; }
 
-        [Column("estimated_hours")]
-        public decimal? EstimatedHours { get; set; }
-
         [Column("message")]
         public string? Message { get; set; }
 

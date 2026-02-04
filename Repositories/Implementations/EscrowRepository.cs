@@ -37,5 +37,13 @@ namespace MentorEdu.Repositories.Implementations
                 .Where(e => e.Status == EscrowStatus.Holding)
                 .SumAsync(e => e.Amount);
         }
+
+        public async Task<Escrow?> GetPendingEscrowByAmountAsync(decimal amount)
+        {
+            return await _dbSet
+                .Where(e => e.OrderId == null && e.Status == EscrowStatus.Holding && e.Amount == amount)
+                .OrderByDescending(e => e.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
     }
 }

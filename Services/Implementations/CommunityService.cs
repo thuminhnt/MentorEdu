@@ -224,11 +224,20 @@ namespace MentorEdu.Services.Implementations
             if (user == null)
                 return ServiceResult<CommunityCommentDto>.NotFoundResult("User not found");
 
+            // Validate parent comment if replying
+            if (request.ParentCommentId.HasValue)
+            {
+                var parentComment = await _unitOfWork.CommunityComments.GetByIdAsync(request.ParentCommentId.Value);
+                if (parentComment == null || parentComment.PostId != request.PostId)
+                    return ServiceResult<CommunityCommentDto>.BadRequestResult("Invalid parent comment");
+            }
+
             var comment = new CommunityComment
             {
                 PostId = request.PostId,
                 AuthorId = userId,
                 Content = request.Content,
+                ParentCommentId = request.ParentCommentId,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -255,7 +264,8 @@ namespace MentorEdu.Services.Implementations
                 AuthorId = userId,
                 AuthorName = user.UserProfile?.FullName,
                 AuthorAvatar = user.UserProfile?.AvatarUrl,
-                IsAuthorMentor = user.Role == UserRole.Mentor
+                IsAuthorMentor = user.Role == UserRole.Mentor,
+                ParentCommentId = comment.ParentCommentId
             };
 
             return ServiceResult<CommunityCommentDto>.CreatedResult(dto, "Comment posted successfully");
@@ -284,7 +294,8 @@ namespace MentorEdu.Services.Implementations
         {
             var comments = await _unitOfWork.CommunityComments.GetByPostIdAsync(postId);
 
-            var dtos = comments.Select(c => new CommunityCommentDto
+            // Convert all comments to DTOs first
+            var allDtos = comments.Select(c => new CommunityCommentDto
             {
                 Id = c.Id,
                 Content = c.Content,
@@ -292,10 +303,30 @@ namespace MentorEdu.Services.Implementations
                 AuthorId = c.AuthorId,
                 AuthorName = c.Author?.UserProfile?.FullName,
                 AuthorAvatar = c.Author?.UserProfile?.AvatarUrl,
-                IsAuthorMentor = c.Author?.Role == UserRole.Mentor
+                IsAuthorMentor = c.Author?.Role == UserRole.Mentor,
+                ParentCommentId = c.ParentCommentId
             }).ToList();
 
-            return ServiceResult<List<CommunityCommentDto>>.SuccessResult(dtos);
+            // Build nested tree recursively
+            var parentComments = allDtos.Where(c => c.ParentCommentId == null).ToList();
+            foreach (var parent in parentComments)
+            {
+                BuildCommentTree(parent, allDtos);
+            }
+
+            return ServiceResult<List<CommunityCommentDto>>.SuccessResult(parentComments);
+        }
+
+        private void BuildCommentTree(CommunityCommentDto parent, List<CommunityCommentDto> allComments)
+        {
+            var replies = allComments.Where(c => c.ParentCommentId == parent.Id).ToList();
+            parent.Replies = replies;
+            
+            // Recursively build tree for each reply
+            foreach (var reply in replies)
+            {
+                BuildCommentTree(reply, allComments);
+            }
         }
 
         #endregion
@@ -382,17 +413,16 @@ namespace MentorEdu.Services.Implementations
             if (post.AuthorId == mentorId)
                 return ServiceResult<CommunityProposalDto>.BadRequestResult("You cannot send a proposal to your own post");
 
-            // Check if already sent proposal
+            // Check if already has a pending proposal
             var existingProposal = await _unitOfWork.Proposals.GetByPostAndMentorAsync(postId, mentorId);
-            if (existingProposal != null)
-                return ServiceResult<CommunityProposalDto>.BadRequestResult("You have already sent a proposal for this post");
+            if (existingProposal != null && existingProposal.Status == ProposalStatus.Pending)
+                return ServiceResult<CommunityProposalDto>.BadRequestResult("You already have a pending proposal for this post");
 
             var proposal = new Proposal
             {
                 PostId = postId,
                 MentorId = mentorId,
                 Price = request.Price,
-                EstimatedHours = request.EstimatedHours,
                 Message = request.Message,
                 Status = ProposalStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
@@ -683,7 +713,6 @@ namespace MentorEdu.Services.Implementations
                 MentorAvatar = mentor?.UserProfile?.AvatarUrl,
                 MentorTitle = mentor?.MentorProfile?.Title,
                 Price = proposal.Price,
-                EstimatedHours = proposal.EstimatedHours,
                 Message = proposal.Message,
                 Status = proposal.Status.ToString(),
                 CreatedAt = proposal.CreatedAt
