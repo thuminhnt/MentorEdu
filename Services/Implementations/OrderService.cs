@@ -163,8 +163,8 @@ namespace MentorEdu.Services.Implementations
             if (order == null)
                 return ServiceResult.NotFoundResult("Order not found");
 
-            if (order.StudentId != userId)
-                return ServiceResult.ForbiddenResult("Only the student can complete this order");
+            if (order.StudentId != userId && order.MentorId != userId)
+                return ServiceResult.ForbiddenResult("You do not have permission to complete this order");
 
             if (order.Status != OrderStatus.InProgress)
                 return ServiceResult.FailResult("Only in-progress orders can be completed");
