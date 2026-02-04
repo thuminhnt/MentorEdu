@@ -17,17 +17,20 @@ namespace MentorEdu.Hubs
         private readonly IGroupService _groupService;
         private readonly ILogger<ChatHub> _logger;
 
+        private readonly IOrderService _orderService;
+
         // Track connected users: userId -> connectionId
         private static readonly Dictionary<long, HashSet<string>> _userConnections = new();
         private static readonly object _lock = new();
         private static readonly Dictionary<string, PendingWorkAction> _pendingWorkActions = new();
         private static readonly object _pendingWorkActionsLock = new();
-        public ChatHub(IChatService chatService, IWorkSessionService workSessionService, IGroupService groupService, ILogger<ChatHub> logger)
+        public ChatHub(IChatService chatService, IWorkSessionService workSessionService, IGroupService groupService, IOrderService orderService, ILogger<ChatHub> logger)
         {
             _chatService = chatService;
             _logger = logger;
             _workSessionService = workSessionService;
             _groupService = groupService;
+            _orderService = orderService;
         }
 
         /// <summary>
@@ -438,6 +441,85 @@ namespace MentorEdu.Hubs
         }
 
         /// <summary>
+        /// Request to complete the order
+        /// </summary>
+        public async Task RequestCompleteOrder(long conversationId, long orderId)
+        {
+            var userId = GetCurrentUserId();
+            if (!await _chatService.UserHasAccessToConversationAsync(userId, conversationId))
+            {
+                await Clients.Caller.SendAsync("Error", "You do not have access to this conversation");
+                return;
+            }
+
+            var conversation = await _chatService.GetConversationByIdAsync(conversationId);
+            if (!conversation.Success || conversation.Data == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Conversation not found");
+                return;
+            }
+
+            if (conversation.Data.Mentor?.Id != userId && conversation.Data.Student?.Id != userId)
+            {
+                await Clients.Caller.SendAsync("Error", "Invalid requester");
+                return;
+            }
+
+            // Find the other user
+            var otherUserId = conversation.Data.Mentor?.Id == userId ? conversation.Data.Student?.Id : conversation.Data.Mentor?.Id;
+            if (otherUserId == null)
+            {
+                 await Clients.Caller.SendAsync("Error", "Partner not found");
+                 return;
+            }
+
+            var requestId = Guid.NewGuid().ToString("N");
+            var pendingAction = new PendingWorkAction
+            {
+                RequestId = requestId,
+                ActionType = WorkActionType.Complete,
+                ConversationId = conversationId,
+                OrderId = orderId,
+                SessionId = null,
+                RequestedByUserId = userId,
+                TargetUserId = otherUserId.Value,
+                MentorId = conversation.Data.Mentor?.Id,
+                StudentId = conversation.Data.Student?.Id,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            lock (_pendingWorkActionsLock)
+            {
+                _pendingWorkActions[requestId] = pendingAction;
+            }
+
+            await Clients.Group($"conversation_{conversationId}")
+                .SendAsync("WorkActionState", new
+                {
+                    requestId,
+                    actionType = pendingAction.ActionType.ToString(),
+                    status = "Waiting",
+                    conversationId,
+                    orderId
+                });
+
+            await SendToUser(otherUserId.Value, "WorkActionPopup", new
+            {
+                requestId,
+                actionType = pendingAction.ActionType.ToString(),
+                conversationId,
+                orderId,
+                requestedByUserId = userId
+            });
+
+            await Clients.Caller.SendAsync("WorkActionSent", new
+            {
+                requestId,
+                actionType = pendingAction.ActionType.ToString()
+            });
+        }
+
+        /// <summary>
         /// Respond to a pending work action
         /// </summary>
         public async Task RespondWorkAction(string requestId, bool accept)
@@ -569,6 +651,33 @@ namespace MentorEdu.Hubs
                                 orderId = endResult.Data.OrderId,
                                 totalMinutes = endResult.Data.TotalMinutes,
                                 endTime = endResult.Data.EndTime
+                            });
+                        break;
+                    }
+                case WorkActionType.Complete:
+                    {
+                        if (!pendingAction.OrderId.HasValue)
+                        {
+                            await Clients.Caller.SendAsync("Error", "Missing order id");
+                            return;
+                        }
+
+                        // Call OrderService to complete
+                        var completeResult = await _orderService.CompleteOrderAsync(pendingAction.OrderId.Value, userId);
+                        
+                        if (!completeResult.Success)
+                        {
+                             await SendToUser(pendingAction.RequestedByUserId, "Error", completeResult.Message ?? "Failed to complete order");
+                             await Clients.Caller.SendAsync("Error", completeResult.Message ?? "Failed to complete order");
+                             return;
+                        }
+
+                        await Clients.Group($"conversation_{pendingAction.ConversationId}")
+                            .SendAsync("OrderCompleted", new
+                            {
+                                orderId = pendingAction.OrderId.Value,
+                                completedBy = pendingAction.RequestedByUserId,
+                                completedAt = DateTime.UtcNow
                             });
                         break;
                     }
@@ -740,7 +849,8 @@ namespace MentorEdu.Hubs
     {
         Start,
         Pause,
-        End
+        End,
+        Complete
     }
 
     #endregion
