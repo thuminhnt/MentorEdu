@@ -183,7 +183,8 @@ namespace MentorEdu.Controllers.Api
             var result = await _communityService.CreateCommentAsync(userId, new CreateCommentDto
             {
                 PostId = postId,
-                Content = request.Content
+                Content = request.Content,
+                ParentCommentId = request.ParentCommentId
             });
 
             if (!result.Success)
@@ -426,5 +427,6 @@ namespace MentorEdu.Controllers.Api
     public class CreateCommentRequest
     {
         public string Content { get; set; } = string.Empty;
+        public long? ParentCommentId { get; set; }
     }
 }

@@ -8,5 +8,6 @@ namespace MentorEdu.Repositories.Interfaces
         Task<Escrow?> GetByOrderIdAsync(long orderId);
         Task<IEnumerable<Escrow>> GetByStatusAsync(EscrowStatus status);
         Task<decimal> GetTotalHoldingAmountAsync();
+        Task<Escrow?> GetPendingEscrowByAmountAsync(decimal amount);
     }
 }

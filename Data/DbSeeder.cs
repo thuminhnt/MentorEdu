@@ -56,8 +56,22 @@ namespace MentorEdu.Data
             await context.AppUsers.AddRangeAsync(admin, student, mentor);
             await context.SaveChangesAsync();
 
-            // Chỉ seed 3 user, không seed thông tin khác
-            await context.SaveChangesAsync();
+            // Seed wallet for student (1,000,000 VND)
+            var studentUser = await context.AppUsers.FirstOrDefaultAsync(u => u.Email == StudentEmail);
+            if (studentUser != null)
+            {
+                var wallet = new Wallet
+                {
+                    UserId = studentUser.Id,
+                    Balance = 1_000_000,
+                    LockedBalance = 0,
+                    Currency = "VND",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                await context.Wallets.AddAsync(wallet);
+                await context.SaveChangesAsync();
+            }
         }
     }
 }

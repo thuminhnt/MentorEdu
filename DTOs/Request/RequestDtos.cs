@@ -15,7 +15,6 @@ namespace MentorEdu.DTOs.Request
         public string? CategoryName { get; set; }
         public long? CategoryId { get; set; }
         public decimal? ExpectedBudget { get; set; }
-        public decimal? ExpectedHours { get; set; }
         public RequestStatus Status { get; set; }
         public string StatusDisplay => Status.ToString();
         public DateTime? CreatedAt { get; set; }
@@ -39,7 +38,6 @@ namespace MentorEdu.DTOs.Request
         public long? CategoryId { get; set; }
         public string? CategoryName { get; set; }
         public decimal? ExpectedBudget { get; set; }
-        public decimal? ExpectedHours { get; set; }
         public RequestStatus Status { get; set; }
         public string StatusDisplay => Status.ToString();
         public DateTime? CreatedAt { get; set; }
@@ -90,9 +88,6 @@ namespace MentorEdu.DTOs.Request
 
         [Range(0, double.MaxValue, ErrorMessage = "Budget must be greater than 0")]
         public decimal? ExpectedBudget { get; set; }
-
-        [Range(0, double.MaxValue, ErrorMessage = "Hours must be greater than 0")]
-        public decimal? ExpectedHours { get; set; }
     }
 
     /// <summary>
@@ -117,6 +112,16 @@ namespace MentorEdu.DTOs.Request
     public class AcceptRequestResultDto
     {
         public long RequestId { get; set; }
+        public long ConversationId { get; set; }
+        public string? Message { get; set; }
+    }
+
+    /// <summary>
+    /// Result DTO for accepting a proposal
+    /// </summary>
+    public class AcceptProposalResultDto
+    {
+        public long ProposalId { get; set; }
         public long ConversationId { get; set; }
         public string? Message { get; set; }
     }

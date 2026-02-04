@@ -13,10 +13,12 @@ namespace MentorEdu.Services.Implementations
     public class RequestService : BaseService, IRequestService
     {
         private readonly IChatService _chatService;
+        private readonly INotificationService _notificationService;
 
-        public RequestService(IUnitOfWork unitOfWork, IChatService chatService) : base(unitOfWork)
+        public RequestService(IUnitOfWork unitOfWork, IChatService chatService, INotificationService notificationService) : base(unitOfWork)
         {
             _chatService = chatService;
+            _notificationService = notificationService;
         }
 
         public async Task<ServiceResult<RequestDetailDto>> GetByIdAsync(long requestId)
@@ -81,14 +83,74 @@ namespace MentorEdu.Services.Implementations
                 Description = request.Description,
                 CategoryId = request.CategoryId,
                 ExpectedBudget = request.ExpectedBudget,
-                ExpectedHours = request.ExpectedHours,
                 Status = RequestStatus.Open,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
 
+            // If budget specified, deduct from wallet and create escrow
+            var budget = request.ExpectedBudget ?? 0;
+            if (budget > 0)
+            {
+                var studentWallet = await _unitOfWork.Wallets.GetByUserIdAsync(studentId);
+                if (studentWallet == null)
+                {
+                    studentWallet = new Wallet
+                    {
+                        UserId = studentId,
+                        Balance = 0,
+                        LockedBalance = 0,
+                        Currency = "VND",
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.Wallets.AddAsync(studentWallet);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+
+                var availableBalance = studentWallet.Balance - studentWallet.LockedBalance;
+                if (availableBalance < budget)
+                {
+                    return ServiceResult<RequestDetailDto>.FailResult($"Insufficient balance. Required: {budget:N0} VND, Available: {availableBalance:N0} VND. Please top up your wallet.");
+                }
+
+                // Move funds to locked balance (escrow)
+                studentWallet.Balance -= budget;
+                studentWallet.LockedBalance += budget;
+                studentWallet.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Wallets.Update(studentWallet);
+            }
+
             await _unitOfWork.Requests.AddAsync(newRequest);
             await _unitOfWork.SaveChangesAsync();
+
+            // Create escrow if budget > 0
+            if (budget > 0)
+            {
+                var escrow = new Escrow
+                {
+                    OrderId = null, // Will be linked when proposal is accepted and order is created
+                    Amount = budget,
+                    Status = EscrowStatus.Holding,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Escrows.AddAsync(escrow);
+
+                // Create transaction record
+                var studentWallet = await _unitOfWork.Wallets.GetByUserIdAsync(studentId);
+                var transaction = new Transaction
+                {
+                    WalletId = studentWallet!.Id,
+                    OrderId = null,
+                    Type = TransactionType.EscrowHold,
+                    Amount = budget,
+                    Status = TransactionStatus.Success,
+                    Description = $"Escrow hold for request: {request.Title}",
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Transactions.AddAsync(transaction);
+                await _unitOfWork.SaveChangesAsync();
+            }
 
             return await GetByIdAsync(newRequest.Id);
         }
@@ -118,7 +180,6 @@ namespace MentorEdu.Services.Implementations
             existingRequest.Description = request.Description;
             existingRequest.CategoryId = request.CategoryId;
             existingRequest.ExpectedBudget = request.ExpectedBudget;
-            existingRequest.ExpectedHours = request.ExpectedHours;
             existingRequest.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.Requests.Update(existingRequest);
@@ -140,14 +201,56 @@ namespace MentorEdu.Services.Implementations
             if (request.Status == RequestStatus.InOrder)
                 return ServiceResult.FailResult("Cannot delete request with active order");
 
-            // Soft delete
-            request.Status = RequestStatus.Deleted;
-            request.UpdatedAt = DateTime.UtcNow;
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
+            {
+                // Check if there's money in escrow that needs to be refunded
+                var budget = request.ExpectedBudget ?? 0;
+                if (budget > 0)
+                {
+                    // Find pending escrow for this request
+                    var escrow = await _unitOfWork.Escrows.GetPendingEscrowByAmountAsync(budget);
+                    
+                    if (escrow != null && escrow.Status == EscrowStatus.Holding)
+                    {
+                        // Refund to student wallet
+                        var studentWallet = await _unitOfWork.Wallets.GetByUserIdAsync(userId);
+                        if (studentWallet != null)
+                        {
+                            studentWallet.Balance += budget;
+                            studentWallet.LockedBalance -= budget;
+                            studentWallet.UpdatedAt = DateTime.UtcNow;
+                            _unitOfWork.Wallets.Update(studentWallet);
 
-            _unitOfWork.Requests.Update(request);
-            await _unitOfWork.SaveChangesAsync();
+                            // Update escrow status
+                            escrow.Status = EscrowStatus.Refunded;
+                            escrow.RefundedAt = DateTime.UtcNow;
+                            _unitOfWork.Escrows.Update(escrow);
 
-            return ServiceResult.SuccessResult("Request deleted successfully");
+                            // Create refund transaction
+                            var transaction = new Transaction
+                            {
+                                WalletId = studentWallet.Id,
+                                OrderId = null,
+                                Type = TransactionType.EscrowRefund,
+                                Amount = budget,
+                                Status = TransactionStatus.Success,
+                                Description = $"Refund from cancelled request: {request.Title}",
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            await _unitOfWork.Transactions.AddAsync(transaction);
+                        }
+                    }
+                }
+
+                // Soft delete
+                request.Status = RequestStatus.Deleted;
+                request.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Requests.Update(request);
+
+                await _unitOfWork.SaveChangesAsync();
+
+                return ServiceResult.SuccessResult("Request deleted and funds refunded successfully");
+            });
         }
 
         public async Task<ServiceResult<PagedResponse<RequestListDto>>> GetMyRequestsAsync(long studentId, int pageNumber, int pageSize)
@@ -230,6 +333,14 @@ namespace MentorEdu.Services.Implementations
             _unitOfWork.Requests.Update(request);
             await _unitOfWork.SaveChangesAsync();
 
+            // Notify student that their request was accepted
+            await _notificationService.CreateNotificationAsync(
+                request.StudentId,
+                NotificationType.RequestAccepted,
+                "Request Accepted",
+                $"Your request '{request.Title}' has been accepted by the mentor."
+            );
+
             // Create conversation between mentor and student
             var conversationResult = await _chatService.GetOrCreateConversationAsync(mentorId, new CreateConversationDto
             {
@@ -270,6 +381,15 @@ namespace MentorEdu.Services.Implementations
             _unitOfWork.Requests.Update(request);
             await _unitOfWork.SaveChangesAsync();
 
+            // Notify student that their request was rejected
+            var reasonText = !string.IsNullOrEmpty(reason) ? $" Reason: {reason}" : "";
+            await _notificationService.CreateNotificationAsync(
+                request.StudentId,
+                NotificationType.RequestRejected,
+                "Request Rejected",
+                $"Your request '{request.Title}' has been rejected.{reasonText}"
+            );
+
             return ServiceResult.SuccessResult("Request rejected successfully");
         }
 
@@ -287,7 +407,6 @@ namespace MentorEdu.Services.Implementations
                 CategoryName = request.Category?.Name,
                 CategoryId = request.CategoryId,
                 ExpectedBudget = request.ExpectedBudget,
-                ExpectedHours = request.ExpectedHours,
                 Status = request.Status,
                 CreatedAt = request.CreatedAt,
                 ProposalCount = request.Proposals?.Count ?? 0,
@@ -307,7 +426,6 @@ namespace MentorEdu.Services.Implementations
                 CategoryId = request.CategoryId,
                 CategoryName = request.Category?.Name,
                 ExpectedBudget = request.ExpectedBudget,
-                ExpectedHours = request.ExpectedHours,
                 Status = request.Status,
                 CreatedAt = request.CreatedAt,
                 UpdatedAt = request.UpdatedAt,
@@ -326,7 +444,6 @@ namespace MentorEdu.Services.Implementations
                     Id = p.Id,
                     RequestId = p.RequestId ?? 0,
                     Price = p.Price,
-                    EstimatedHours = p.EstimatedHours,
                     Message = p.Message,
                     Status = p.Status,
                     CreatedAt = p.CreatedAt,

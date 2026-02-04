@@ -83,6 +83,10 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
 
+                    b.Property<long?>("ParentCommentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_comment_id");
+
                     b.Property<long>("PostId")
                         .HasColumnType("bigint")
                         .HasColumnName("post_id");
@@ -90,6 +94,8 @@ namespace MentorEdu.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
+
+                    b.HasIndex("ParentCommentId");
 
                     b.HasIndex("PostId");
 
@@ -260,7 +266,7 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
 
-                    b.Property<long>("OrderId")
+                    b.Property<long?>("OrderId")
                         .HasColumnType("bigint")
                         .HasColumnName("order_id");
 
@@ -281,7 +287,8 @@ namespace MentorEdu.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[order_id] IS NOT NULL");
 
                     b.ToTable("escrows", (string)null);
                 });
@@ -885,10 +892,6 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
 
-                    b.Property<decimal?>("EstimatedHours")
-                        .HasColumnType("decimal(18,2)")
-                        .HasColumnName("estimated_hours");
-
                     b.Property<long>("MentorId")
                         .HasColumnType("bigint")
                         .HasColumnName("mentor_id");
@@ -1019,10 +1022,6 @@ namespace MentorEdu.Data.Migrations
                     b.Property<decimal?>("ExpectedBudget")
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("expected_budget");
-
-                    b.Property<decimal?>("ExpectedHours")
-                        .HasColumnType("decimal(18,2)")
-                        .HasColumnName("expected_hours");
 
                     b.Property<long?>("MentorId")
                         .HasColumnType("bigint")
@@ -1708,6 +1707,10 @@ namespace MentorEdu.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MentorEdu.Models.CommunityComment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId");
+
                     b.HasOne("MentorEdu.Models.CommunityPost", "Post")
                         .WithMany("Comments")
                         .HasForeignKey("PostId")
@@ -1715,6 +1718,8 @@ namespace MentorEdu.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Author");
+
+                    b.Navigation("ParentComment");
 
                     b.Navigation("Post");
                 });
@@ -1803,8 +1808,7 @@ namespace MentorEdu.Data.Migrations
                     b.HasOne("MentorEdu.Models.Order", "Order")
                         .WithOne("Escrow")
                         .HasForeignKey("MentorEdu.Models.Escrow", "OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Order");
                 });
@@ -2302,6 +2306,11 @@ namespace MentorEdu.Data.Migrations
                     b.Navigation("MentorCategories");
 
                     b.Navigation("Requests");
+                });
+
+            modelBuilder.Entity("MentorEdu.Models.CommunityComment", b =>
+                {
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("MentorEdu.Models.CommunityPost", b =>

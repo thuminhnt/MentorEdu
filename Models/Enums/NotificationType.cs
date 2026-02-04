@@ -5,6 +5,8 @@ namespace MentorEdu.Models.Enums
         System,
         RequestCreated,
         RequestAssigned,
+        RequestAccepted,
+        RequestRejected,
         ProposalCreated,
         NewProposal,
         ProposalAccepted,

@@ -1,6 +1,7 @@
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Request;
 using MentorEdu.DTOs.User;
+using MentorEdu.DTOs.Chat;
 using MentorEdu.Models;
 using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
@@ -11,8 +12,13 @@ namespace MentorEdu.Services.Implementations
 {
     public class ProposalService : BaseService, IProposalService
     {
-        public ProposalService(IUnitOfWork unitOfWork) : base(unitOfWork)
+        private readonly IChatService _chatService;
+        private readonly INotificationService _notificationService;
+
+        public ProposalService(IUnitOfWork unitOfWork, IChatService chatService, INotificationService notificationService) : base(unitOfWork)
         {
+            _chatService = chatService;
+            _notificationService = notificationService;
         }
 
         public async Task<ServiceResult<ProposalDetailDto>> GetByIdAsync(long proposalId)
@@ -41,17 +47,16 @@ namespace MentorEdu.Services.Implementations
             if (requestEntity.Status != RequestStatus.Open)
                 return ServiceResult<ProposalDetailDto>.FailResult("Request is no longer open for proposals");
 
-            // Check if mentor already sent proposal
+            // Check if mentor already has a pending proposal
             var existingProposal = await _unitOfWork.Proposals.GetByRequestAndMentorAsync(request.RequestId, mentorId);
-            if (existingProposal != null)
-                return ServiceResult<ProposalDetailDto>.FailResult("You have already submitted a proposal for this request");
+            if (existingProposal != null && existingProposal.Status == ProposalStatus.Pending)
+                return ServiceResult<ProposalDetailDto>.FailResult("You already have a pending proposal for this request");
 
             var proposal = new Proposal
             {
                 RequestId = request.RequestId,
                 MentorId = mentorId,
                 Price = request.Price,
-                EstimatedHours = request.EstimatedHours,
                 Message = request.Message,
                 Status = ProposalStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
@@ -89,7 +94,6 @@ namespace MentorEdu.Services.Implementations
                 return ServiceResult<ProposalDetailDto>.FailResult("Only pending proposals can be edited");
 
             proposal.Price = request.Price;
-            proposal.EstimatedHours = request.EstimatedHours;
             proposal.Message = request.Message;
             proposal.UpdatedAt = DateTime.UtcNow;
 
@@ -129,18 +133,23 @@ namespace MentorEdu.Services.Implementations
             return ServiceResult<List<ProposalListDto>>.SuccessResult(dtos);
         }
 
-        public async Task<ServiceResult> AcceptProposalAsync(long proposalId, long studentId)
+        public async Task<ServiceResult<AcceptProposalResultDto>> AcceptProposalAsync(long proposalId, long studentId)
         {
             var proposal = await _unitOfWork.Proposals.GetByIdWithDetailsAsync(proposalId);
             
             if (proposal == null)
-                return ServiceResult.NotFoundResult("Proposal not found");
+                return ServiceResult<AcceptProposalResultDto>.NotFoundResult("Proposal not found");
 
-            if (proposal.Request?.StudentId != studentId)
-                return ServiceResult.ForbiddenResult("You do not have permission to accept this proposal");
+            // Check ownership: proposal on request (direct) or on community post
+            bool isOwner = proposal.RequestId.HasValue 
+                ? proposal.Request?.StudentId == studentId 
+                : proposal.Post?.AuthorId == studentId;
+
+            if (!isOwner)
+                return ServiceResult<AcceptProposalResultDto>.ForbiddenResult("You do not have permission to accept this proposal");
 
             if (proposal.Status != ProposalStatus.Pending)
-                return ServiceResult.FailResult("Proposal is no longer pending");
+                return ServiceResult<AcceptProposalResultDto>.FailResult("Proposal is no longer pending");
 
             // Get student wallet and validate balance
             var proposalPrice = proposal.Price ?? 0;
@@ -165,15 +174,34 @@ namespace MentorEdu.Services.Implementations
             var availableBalance = studentWallet.Balance - studentWallet.LockedBalance;
             if (availableBalance < proposalPrice)
             {
-                return ServiceResult.FailResult($"Insufficient balance. Required: {proposalPrice:N0} VND, Available: {availableBalance:N0} VND. Please top up your wallet.");
+                return ServiceResult<AcceptProposalResultDto>.FailResult($"Insufficient balance. Required: {proposalPrice:N0} VND, Available: {availableBalance:N0} VND. Please top up your wallet.");
             }
 
             return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
-                // Deduct funds from student wallet
-                studentWallet.Balance -= proposalPrice;
-                studentWallet.UpdatedAt = DateTime.UtcNow;
-                _unitOfWork.Wallets.Update(studentWallet);
+                // Check if escrow already exists (from request creation) or need to create new one
+                Escrow? existingEscrow = null;
+                bool needToDeductWallet = true;
+
+                if (proposal.RequestId.HasValue)
+                {
+                    // For direct request proposals, escrow should already exist from request creation
+                    existingEscrow = await _unitOfWork.Escrows.GetPendingEscrowByAmountAsync(proposalPrice);
+
+                    if (existingEscrow != null)
+                    {
+                        needToDeductWallet = false; // Funds already held from request creation
+                    }
+                }
+
+                // Deduct funds from wallet only if escrow doesn't exist (community post case)
+                if (needToDeductWallet)
+                {
+                    studentWallet.Balance -= proposalPrice;
+                    studentWallet.LockedBalance += proposalPrice;
+                    studentWallet.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.Wallets.Update(studentWallet);
+                }
 
                 // Accept this proposal
                 proposal.Status = ProposalStatus.Accepted;
@@ -216,16 +244,25 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Orders.AddAsync(order);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Create escrow with the held funds
-                var escrow = new Escrow
+                // Link existing escrow to order or create new one
+                if (existingEscrow != null)
                 {
-                    OrderId = order.Id,
-                    Amount = proposalPrice,
-                    Status = EscrowStatus.Holding,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                await _unitOfWork.Escrows.AddAsync(escrow);
+                    // Link existing escrow to the new order
+                    existingEscrow.OrderId = order.Id;
+                    _unitOfWork.Escrows.Update(existingEscrow);
+                }
+                else
+                {
+                    // Create new escrow (for community post proposals)
+                    var escrow = new Escrow
+                    {
+                        OrderId = order.Id,
+                        Amount = proposalPrice,
+                        Status = EscrowStatus.Holding,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.Escrows.AddAsync(escrow);
+                }
 
                 // Create payment transaction record
                 var transaction = new Transaction
@@ -242,7 +279,31 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Transactions.AddAsync(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return ServiceResult.SuccessResult("Proposal accepted and payment processed successfully. Order is now active.");
+                // Notify mentor that their proposal was accepted
+                var proposalTitle = proposal.Request?.Title ?? proposal.Post?.Title ?? "your proposal";
+                await _notificationService.CreateNotificationAsync(
+                    proposal.MentorId,
+                    NotificationType.ProposalAccepted,
+                    "Proposal Accepted",
+                    $"Your proposal for '{proposalTitle}' has been accepted! Order is now active."
+                );
+
+                // Create conversation between student and mentor
+                var conversationResult = await _chatService.GetOrCreateConversationAsync(studentId, new CreateConversationDto
+                {
+                    ParticipantId = proposal.MentorId
+                });
+
+                var conversationId = conversationResult.Success && conversationResult.Data != null
+                    ? conversationResult.Data.Id
+                    : 0;
+
+                return ServiceResult<AcceptProposalResultDto>.SuccessResult(new AcceptProposalResultDto
+                {
+                    ProposalId = proposalId,
+                    ConversationId = conversationId,
+                    Message = "Proposal accepted and payment processed successfully. Order is now active."
+                });
             });
         }
 
@@ -253,7 +314,21 @@ namespace MentorEdu.Services.Implementations
             if (proposal == null)
                 return ServiceResult.NotFoundResult("Proposal not found");
 
-            if (proposal.Request?.StudentId != studentId)
+            // Check ownership: either student from request or author of community post
+            bool hasPermission = false;
+            
+            if (proposal.RequestId != null && proposal.Request != null)
+            {
+                // Direct request proposal
+                hasPermission = proposal.Request.StudentId == studentId;
+            }
+            else if (proposal.PostId != null && proposal.Post != null)
+            {
+                // Community post proposal
+                hasPermission = proposal.Post.AuthorId == studentId;
+            }
+
+            if (!hasPermission)
                 return ServiceResult.ForbiddenResult("You do not have permission to reject this proposal");
 
             if (proposal.Status != ProposalStatus.Pending)
@@ -264,6 +339,16 @@ namespace MentorEdu.Services.Implementations
 
             _unitOfWork.Proposals.Update(proposal);
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify mentor that their proposal was rejected
+            var proposalTitle = proposal.Request?.Title ?? proposal.Post?.Title ?? "your proposal";
+            var reasonText = !string.IsNullOrEmpty(reason) ? $" Reason: {reason}" : "";
+            await _notificationService.CreateNotificationAsync(
+                proposal.MentorId,
+                NotificationType.ProposalRejected,
+                "Proposal Rejected",
+                $"Your proposal for '{proposalTitle}' has been rejected.{reasonText}"
+            );
 
             return ServiceResult.SuccessResult("Proposal rejected successfully");
         }
@@ -292,7 +377,6 @@ namespace MentorEdu.Services.Implementations
                 Id = proposal.Id,
                 RequestId = proposal.RequestId ?? 0,
                 Price = proposal.Price,
-                EstimatedHours = proposal.EstimatedHours,
                 Message = proposal.Message,
                 Status = proposal.Status,
                 CreatedAt = proposal.CreatedAt,
@@ -313,7 +397,6 @@ namespace MentorEdu.Services.Implementations
                 RequestId = proposal.RequestId ?? 0,
                 RequestTitle = proposal.Request?.Title,
                 Price = proposal.Price,
-                EstimatedHours = proposal.EstimatedHours,
                 Message = proposal.Message,
                 Status = proposal.Status,
                 CreatedAt = proposal.CreatedAt,

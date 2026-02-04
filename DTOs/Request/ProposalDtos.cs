@@ -12,7 +12,6 @@ namespace MentorEdu.DTOs.Request
         public long Id { get; set; }
         public long RequestId { get; set; }
         public decimal? Price { get; set; }
-        public decimal? EstimatedHours { get; set; }
         public string? Message { get; set; }
         public ProposalStatus Status { get; set; }
         public string StatusDisplay => Status.ToString();
@@ -36,7 +35,6 @@ namespace MentorEdu.DTOs.Request
         public long RequestId { get; set; }
         public string? RequestTitle { get; set; }
         public decimal? Price { get; set; }
-        public decimal? EstimatedHours { get; set; }
         public string? Message { get; set; }
         public ProposalStatus Status { get; set; }
         public string StatusDisplay => Status.ToString();
@@ -62,9 +60,6 @@ namespace MentorEdu.DTOs.Request
         [Range(0, double.MaxValue, ErrorMessage = "Price must be greater than 0")]
         public decimal Price { get; set; }
 
-        [Range(0, double.MaxValue, ErrorMessage = "Hours must be greater than 0")]
-        public decimal? EstimatedHours { get; set; }
-
         [Required(ErrorMessage = "Message is required")]
         [MaxLength(2000)]
         public string Message { get; set; } = string.Empty;
@@ -78,9 +73,6 @@ namespace MentorEdu.DTOs.Request
         [Required(ErrorMessage = "Price is required")]
         [Range(0, double.MaxValue, ErrorMessage = "Price must be greater than 0")]
         public decimal Price { get; set; }
-
-        [Range(0, double.MaxValue, ErrorMessage = "Hours must be greater than 0")]
-        public decimal? EstimatedHours { get; set; }
 
         [Required(ErrorMessage = "Message is required")]
         [MaxLength(2000)]
