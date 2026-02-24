@@ -632,6 +632,7 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = r.Id,
                 Reason = r.Reason,
+                Details = r.Details,
                 Status = r.Status,
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt,
@@ -667,6 +668,7 @@ namespace MentorEdu.Services.Implementations
             {
                 Id = report.Id,
                 Reason = report.Reason,
+                Details = report.Details,
                 Status = report.Status,
                 CreatedAt = report.CreatedAt,
                 UpdatedAt = report.UpdatedAt,
@@ -719,6 +721,48 @@ namespace MentorEdu.Services.Implementations
                     reportedUser.IsActive = false;
                     reportedUser.UpdatedAt = DateTime.UtcNow;
                     _unitOfWork.Users.Update(reportedUser);
+                }
+            }
+
+            // If resolving a report that has a ReviewId, delete the review
+            if (request.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase) && report.ReviewId.HasValue)
+            {
+                var reviewId = report.ReviewId.Value;
+                var review = await _unitOfWork.Reviews.GetByIdAsync(reviewId);
+                if (review != null)
+                {
+                    // Clear review_id on all reports referencing this review to avoid FK constraint
+                    var reportsWithReview = await _unitOfWork.Reports.Query()
+                        .Where(r => r.ReviewId == reviewId)
+                        .ToListAsync();
+                    foreach (var rpt in reportsWithReview)
+                    {
+                        rpt.ReviewId = null;
+                        _unitOfWork.Reports.Update(rpt);
+                    }
+
+                    // Recalculate mentor rating
+                    var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(review.ToUserId);
+                    if (mentorProfile != null && mentorProfile.RatingCount > 0)
+                    {
+                        var remainingReviews = await _unitOfWork.Reviews.Query()
+                            .Where(r => r.ToUserId == review.ToUserId && r.Id != review.Id)
+                            .ToListAsync();
+
+                        if (remainingReviews.Any())
+                        {
+                            mentorProfile.RatingAvg = (decimal)remainingReviews.Average(r => r.Rating);
+                            mentorProfile.RatingCount = remainingReviews.Count;
+                        }
+                        else
+                        {
+                            mentorProfile.RatingAvg = 0;
+                            mentorProfile.RatingCount = 0;
+                        }
+                        mentorProfile.UpdatedAt = DateTime.UtcNow;
+                    }
+
+                    _unitOfWork.Reviews.Remove(review);
                 }
             }
 

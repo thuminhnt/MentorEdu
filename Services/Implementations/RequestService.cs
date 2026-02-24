@@ -327,35 +327,113 @@ namespace MentorEdu.Services.Implementations
             if (request.Status != RequestStatus.Open)
                 return ServiceResult<AcceptRequestResultDto>.FailResult($"Request cannot be accepted. Current status: {request.Status}");
 
-            // Update request status
-            request.Status = RequestStatus.Accepted;
-            request.UpdatedAt = DateTime.UtcNow;
-            _unitOfWork.Requests.Update(request);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Notify student that their request was accepted
-            await _notificationService.CreateNotificationAsync(
-                request.StudentId,
-                NotificationType.RequestAccepted,
-                "Request Accepted",
-                $"Your request '{request.Title}' has been accepted by the mentor."
-            );
-
-            // Create conversation between mentor and student
-            var conversationResult = await _chatService.GetOrCreateConversationAsync(mentorId, new CreateConversationDto
+            return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
-                ParticipantId = request.StudentId
-            });
+                // Update request status to InOrder (since we're creating an order)
+                request.Status = RequestStatus.InOrder;
+                request.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Requests.Update(request);
 
-            var conversationId = conversationResult.Success && conversationResult.Data != null
-                ? conversationResult.Data.Id
-                : 0;
+                // Get budget from request for order and escrow
+                var budget = request.ExpectedBudget ?? 0;
 
-            return ServiceResult<AcceptRequestResultDto>.SuccessResult(new AcceptRequestResultDto
-            {
-                RequestId = requestId,
-                ConversationId = conversationId,
-                Message = "Request accepted successfully"
+                // Create Order with request_id
+                var order = new Order
+                {
+                    RequestId = requestId,  // Link to the request
+                    ProposalId = null,      // No proposal in direct accept
+                    StudentId = request.StudentId,
+                    MentorId = mentorId,
+                    BillingType = BillingType.Fixed,
+                    AgreedPrice = budget,
+                    Status = OrderStatus.InProgress,
+                    StartedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _unitOfWork.Orders.AddAsync(order);
+                await _unitOfWork.SaveChangesAsync();
+
+                // Handle escrow - find existing escrow from request creation and link to order
+                if (budget > 0)
+                {
+                    var existingEscrow = await _unitOfWork.Escrows.GetPendingEscrowByAmountAsync(budget);
+                    
+                    if (existingEscrow != null)
+                    {
+                        // Link existing escrow to the new order
+                        existingEscrow.OrderId = order.Id;
+                        _unitOfWork.Escrows.Update(existingEscrow);
+                    }
+                    else
+                    {
+                        // Create new escrow if not exists (shouldn't happen if budget was set during request creation)
+                        var studentWallet = await _unitOfWork.Wallets.GetByUserIdAsync(request.StudentId);
+                        if (studentWallet != null)
+                        {
+                            var availableBalance = studentWallet.Balance - studentWallet.LockedBalance;
+                            if (availableBalance >= budget)
+                            {
+                                studentWallet.Balance -= budget;
+                                studentWallet.LockedBalance += budget;
+                                studentWallet.UpdatedAt = DateTime.UtcNow;
+                                _unitOfWork.Wallets.Update(studentWallet);
+
+                                var escrow = new Escrow
+                                {
+                                    OrderId = order.Id,
+                                    Amount = budget,
+                                    Status = EscrowStatus.Holding,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                await _unitOfWork.Escrows.AddAsync(escrow);
+
+                                // Create transaction record
+                                var transaction = new Transaction
+                                {
+                                    WalletId = studentWallet.Id,
+                                    OrderId = order.Id,
+                                    Type = TransactionType.EscrowHold,
+                                    Amount = budget,
+                                    Status = TransactionStatus.Success,
+                                    Description = $"Payment for order #{order.Id} - {request.Title}",
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                await _unitOfWork.Transactions.AddAsync(transaction);
+                            }
+                        }
+                    }
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+
+                // Notify student that their request was accepted
+                await _notificationService.CreateNotificationAsync(
+                    request.StudentId,
+                    NotificationType.RequestAccepted,
+                    "Request Accepted",
+                    $"Your request '{request.Title}' has been accepted by the mentor. Order is now active."
+                );
+
+                // Create conversation between mentor and student
+                var conversationResult = await _chatService.GetOrCreateConversationAsync(mentorId, new CreateConversationDto
+                {
+                    RequestId = requestId,
+                    OrderId = order.Id,
+                    ParticipantId = request.StudentId
+                });
+
+                var conversationId = conversationResult.Success && conversationResult.Data != null
+                    ? conversationResult.Data.Id
+                    : 0;
+
+                return ServiceResult<AcceptRequestResultDto>.SuccessResult(new AcceptRequestResultDto
+                {
+                    RequestId = requestId,
+                    ConversationId = conversationId,
+                    Message = "Request accepted and order created successfully"
+                });
             });
         }
 

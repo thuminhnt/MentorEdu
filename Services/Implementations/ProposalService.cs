@@ -291,6 +291,8 @@ namespace MentorEdu.Services.Implementations
                 // Create conversation between student and mentor
                 var conversationResult = await _chatService.GetOrCreateConversationAsync(studentId, new CreateConversationDto
                 {
+                    RequestId = proposal.RequestId,
+                    OrderId = order.Id,
                     ParticipantId = proposal.MentorId
                 });
 

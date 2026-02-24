@@ -32,7 +32,12 @@ namespace MentorEdu.Services.Implementations
         {
             var conversations = await _unitOfWork.Conversations.GetByUserIdAsync(userId);
 
-            var dtos = conversations.Select(c => MapToConversationListDto(c, userId)).ToList();
+            var dtos = new List<ConversationListDto>();
+            foreach (var c in conversations)
+            {
+                var unreadCount = await _unitOfWork.Messages.GetUnreadCountByConversationAsync(c.Id, userId);
+                dtos.Add(MapToConversationListDto(c, userId, unreadCount));
+            }
 
             // Sort by last message time
             dtos = dtos.OrderByDescending(d => d.LastMessageAt ?? d.CreatedAt).ToList();
@@ -284,12 +289,11 @@ namespace MentorEdu.Services.Implementations
 
         #region Private Methods
 
-        private ConversationListDto MapToConversationListDto(Conversation conversation, long currentUserId)
+        private ConversationListDto MapToConversationListDto(Conversation conversation, long currentUserId, int unreadCount)
         {
             var isStudent = conversation.StudentId == currentUserId;
             var participant = isStudent ? conversation.Mentor : conversation.Student;
             var lastMessage = conversation.Messages?.OrderByDescending(m => m.CreatedAt).FirstOrDefault();
-            var unreadCount = conversation.Messages?.Count(m => !m.IsRead && m.SenderId != currentUserId) ?? 0;
 
             return new ConversationListDto
             {

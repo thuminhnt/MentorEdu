@@ -38,5 +38,15 @@ namespace MentorEdu.Repositories.Implementations
             _context.GroupMembers.Remove(entity);
             await _context.SaveChangesAsync();
         }
+
+        public async Task UpdateLastReadAtAsync(long groupId, long userId)
+        {
+            var member = await _context.GroupMembers
+                .FirstOrDefaultAsync(gm => gm.GroupId == groupId && gm.UserId == userId);
+            if (member != null)
+            {
+                member.LastReadAt = DateTime.UtcNow;
+            }
+        }
     }
 }

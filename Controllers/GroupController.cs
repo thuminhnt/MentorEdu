@@ -26,18 +26,26 @@ namespace MentorEdu.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateGroup([FromBody] CreateGroupDto dto)
         {
+            _logger.LogInformation("[GroupController] CreateGroup called");
             var userId = GetCurrentUserId();
+            _logger.LogInformation($"[GroupController] UserId: {userId}, Name: {dto?.Name}");
+            
             if (userId == 0)
             {
+                _logger.LogWarning("[GroupController] Unauthorized: userId = 0");
                 return Unauthorized(new { message = "User not authenticated" });
             }
 
             var result = await _groupService.CreateGroupAsync(userId, dto);
+            _logger.LogInformation($"[GroupController] Service result: Success={result.Success}, Message={result.Message}");
+            
             if (!result.Success)
             {
+                _logger.LogWarning($"[GroupController] Failed to create group: {result.Message}");
                 return BadRequest(new { message = result.Message });
             }
 
+            _logger.LogInformation($"[GroupController] Group created successfully: {result.Data?.Id}");
             return Ok(result);
         }
 
@@ -132,6 +140,49 @@ namespace MentorEdu.Controllers
             }
 
             var result = await _groupService.LeaveGroupAsync(userId, groupId);
+            if (!result.Success)
+            {
+                return BadRequest(new { message = result.Message });
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Add member to group (Admin only)
+        /// </summary>
+        [HttpPost("{groupId}/members/{userId}")]
+        public async Task<IActionResult> AddMember(long groupId, long userId)
+        {
+            var adminId = GetCurrentUserId();
+            if (adminId == 0)
+            {
+                return Unauthorized(new { message = "User not authenticated" });
+            }
+
+            var result = await _groupService.AddMemberAsync(adminId, groupId, userId);
+            if (!result.Success)
+            {
+                return BadRequest(new { message = result.Message });
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Send message to group
+        /// </summary>
+        [HttpPost("{groupId}/messages")]
+        public async Task<IActionResult> SendMessage(long groupId, [FromBody] SendGroupMessageDto dto)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == 0)
+            {
+                return Unauthorized(new { message = "User not authenticated" });
+            }
+
+            dto.GroupId = groupId;
+            var result = await _groupService.SendGroupMessageAsync(userId, dto);
             if (!result.Success)
             {
                 return BadRequest(new { message = result.Message });

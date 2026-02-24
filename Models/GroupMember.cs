@@ -19,6 +19,9 @@ namespace MentorEdu.Models
         [Column("joined_at")]
         public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
 
+        [Column("last_read_at")]
+        public DateTime? LastReadAt { get; set; }
+
         [Column("role")]
         public GroupRole Role { get; set; } = GroupRole.Member; // Admin (Mentor) or Member (Student)
 

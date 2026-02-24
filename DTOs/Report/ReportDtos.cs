@@ -9,6 +9,7 @@ namespace MentorEdu.DTOs.Report
     {
         public long Id { get; set; }
         public string? Reason { get; set; }
+        public string? Details { get; set; }
         public string? Status { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -37,6 +38,7 @@ namespace MentorEdu.DTOs.Report
     {
         public long Id { get; set; }
         public string? Reason { get; set; }
+        public string? Details { get; set; }
         public string? Status { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
