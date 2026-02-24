@@ -16,7 +16,8 @@ namespace MentorEdu.Services.Implementations
         private readonly int _autoRejectThreshold;
         private readonly bool _isEnabled;
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
-        private const string ModelName = "gemini-1.5-flash";
+        private const string ModelName = "gemini-2.0-flash";
+        private const string ChatModelName = "gemini-2.0-flash"; // Same model, quota saved via token limits
 
         // Supported file types for multimodal analysis
         private static readonly Dictionary<string, string> SupportedMimeTypes = new()
@@ -400,6 +401,7 @@ Respond with ONLY the JSON object, no additional text.";
 
         /// <summary>
         /// General AI chat method for chatbot functionality
+        /// Uses the cheapest model (flash-lite) with limited tokens to minimize quota usage
         /// </summary>
         public async Task<string> GeneralAIChatAsync(string userMessage, List<ChatMessage>? conversationHistory = null)
         {
@@ -410,40 +412,35 @@ Respond with ONLY the JSON object, no additional text.";
 
             try
             {
-                var requestUrl = $"{BaseUrl}/models/{ModelName}:generateContent?key={_apiKey}";
+                // Use the cheapest model for chatbot
+                var requestUrl = $"{BaseUrl}/models/{ChatModelName}:generateContent?key={_apiKey}";
+
+                // Truncate user input to save tokens
+                const int maxInputLength = 500;
+                if (userMessage.Length > maxInputLength)
+                {
+                    userMessage = userMessage.Substring(0, maxInputLength) + "...";
+                }
 
                 // Build contents array with conversation history
                 var contents = new List<object>();
 
-                // Add system instruction as first message
-                var systemPrompt = @"You are an AI assistant for MentorEdu - an educational mentoring platform that connects students with mentors.
+                // Short system prompt to save tokens
+                var systemPrompt = @"You are an AI assistant for MentorEdu, an educational mentoring platform. Help users with finding mentors, booking sessions, posting requests, community features, and profile management. Reply in the user's language. Be concise.";
 
-Your role is to:
-- Help users understand how to use the MentorEdu platform
-- Answer questions about finding mentors, booking sessions, posting requests
-- Provide general educational guidance and study tips
-- Be friendly, helpful, and professional
-- Answer in the same language as the user's message (Vietnamese or English)
-
-Key platform features you can help with:
-- Finding and browsing mentors by category/skill
-- Creating learning requests
-- Booking mentoring sessions
-- Managing work sessions and payments
-- Community posts and interactions
-- Profile management
-
-If you don't know something specific about the platform, provide general helpful guidance and suggest the user contact support for specific issues.";
-
-                // Add conversation history if provided
+                // Add conversation history (truncate each message to save tokens)
+                const int maxHistoryContentLength = 200;
                 if (conversationHistory != null && conversationHistory.Count > 0)
                 {
                     foreach (var msg in conversationHistory)
                     {
+                        var text = msg.Content.Length > maxHistoryContentLength
+                            ? msg.Content.Substring(0, maxHistoryContentLength) + "..."
+                            : msg.Content;
                         contents.Add(new
                         {
                             role = msg.Role == "assistant" ? "model" : "user",
-                            parts = new[] { new { text = msg.Content } }
+                            parts = new[] { new { text } }
                         });
                     }
                 }
@@ -465,33 +462,40 @@ If you don't know something specific about the platform, provide general helpful
                     generationConfig = new
                     {
                         temperature = 0.7,
-                        maxOutputTokens = 1024
+                        maxOutputTokens = 512
                     }
                 };
 
                 var jsonContent = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
+                // Single request - NO retries to preserve free-tier quota
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync(requestUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                if (!response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("Gemini API error: {StatusCode} - {Response}",
-                        response.StatusCode, responseContent);
-                    throw new Exception($"Gemini API error: {response.StatusCode}");
+                    // Parse response
+                    using var doc = JsonDocument.Parse(responseContent);
+                    var root = doc.RootElement;
+                    var candidates = root.GetProperty("candidates");
+                    var firstCandidate = candidates[0];
+                    var contentObj = firstCandidate.GetProperty("content");
+                    var parts = contentObj.GetProperty("parts");
+                    var textPart = parts[0].GetProperty("text").GetString();
+
+                    return textPart ?? "Sorry, I could not generate a response. Please try again.";
                 }
 
-                // Parse response
-                using var doc = JsonDocument.Parse(responseContent);
-                var root = doc.RootElement;
-                var candidates = root.GetProperty("candidates");
-                var firstCandidate = candidates[0];
-                var contentObj = firstCandidate.GetProperty("content");
-                var parts = contentObj.GetProperty("parts");
-                var textPart = parts[0].GetProperty("text").GetString();
+                _logger.LogError("Gemini API error: {StatusCode} - {Response}",
+                    response.StatusCode, responseContent);
 
-                return textPart ?? "Xin lỗi, tôi không thể tạo phản hồi. Vui lòng thử lại.";
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    throw new Exception("RATE_LIMITED: AI service is temporarily overloaded. Please try again in a few moments.");
+                }
+
+                throw new Exception($"Gemini API error: {response.StatusCode}");
             }
             catch (Exception ex)
             {
