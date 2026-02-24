@@ -395,6 +395,10 @@ namespace MentorEdu.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("joined_at");
 
+                    b.Property<DateTime?>("LastReadAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_read_at");
+
                     b.Property<int>("Role")
                         .HasColumnType("int")
                         .HasColumnName("role");

@@ -115,6 +115,7 @@ namespace MentorEdu.Repositories.Implementations
                     .ThenInclude(s => s.UserProfile)
                 .Include(o => o.Mentor)
                     .ThenInclude(m => m.UserProfile)
+                .Include(o => o.Reviews)
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)

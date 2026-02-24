@@ -559,7 +559,8 @@ namespace MentorEdu.Services.Implementations
                 MentorId = order.MentorId,
                 MentorName = order.Mentor?.UserProfile?.FullName,
                 MentorAvatar = order.Mentor?.UserProfile?.AvatarUrl,
-                HasEscrow = order.Escrow != null
+                HasEscrow = order.Escrow != null,
+                IsReviewed = order.Reviews != null && order.Reviews.Any()
             };
         }
 

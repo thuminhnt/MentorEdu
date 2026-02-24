@@ -1,4 +1,5 @@
 using MentorEdu.Models.Enums;
+using System.Text.Json.Serialization;
 
 namespace MentorEdu.DTOs.Groups
 {
@@ -6,6 +7,8 @@ namespace MentorEdu.DTOs.Groups
     {
         public long GroupId { get; set; }
         public string? Content { get; set; }
+        
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public MessageType MessageType { get; set; } = MessageType.Text;
     }
 }

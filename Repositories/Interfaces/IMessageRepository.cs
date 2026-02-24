@@ -10,6 +10,7 @@ namespace MentorEdu.Repositories.Interfaces
             int pageNumber,
             int pageSize);
         Task<int> GetUnreadCountByUserAsync(long userId);
+        Task<int> GetUnreadCountByConversationAsync(long conversationId, long userId);
         Task MarkAsReadAsync(long conversationId, long userId);
     }
 }

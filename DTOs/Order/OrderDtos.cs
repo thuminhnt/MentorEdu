@@ -35,6 +35,7 @@ namespace MentorEdu.DTOs.Order
         // Summary
         public int TotalSessionMinutes { get; set; }
         public bool HasEscrow { get; set; }
+        public bool IsReviewed { get; set; }
     }
 
     /// <summary>
@@ -136,7 +137,7 @@ namespace MentorEdu.DTOs.Order
     }
 
     /// <summary>
-    /// Request c?p nh?t tr?ng thái Order
+    /// Request c?p nh?t tr?ng thï¿½i Order
     /// </summary>
     public class UpdateOrderStatusDto
     {

@@ -8,6 +8,7 @@ namespace MentorEdu.Repositories.Interfaces
         Task<GroupMember?> GetMemberAsync(long groupId, long userId);
         Task<bool> IsMemberAsync(long groupId, long userId);
         Task DeleteAsync(GroupMember entity);
+        Task UpdateLastReadAtAsync(long groupId, long userId);
         // ho?c Task DeleteAsync(int id);
     }
 

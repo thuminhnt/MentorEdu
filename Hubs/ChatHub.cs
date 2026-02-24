@@ -342,6 +342,21 @@ namespace MentorEdu.Hubs
                 .SendAsync("UserGroupTyping", new { UserId = userId, GroupId = groupId, IsTyping = isTyping });
         }
 
+        /// <summary>
+        /// Mark all group messages as read for the current user
+        /// </summary>
+        public async Task MarkGroupAsRead(long groupId)
+        {
+            var userId = GetCurrentUserId();
+
+            await _groupService.MarkGroupAsReadAsync(groupId, userId);
+
+            // Notify the caller that messages are read
+            await Clients.Caller.SendAsync("GroupMessagesRead", new { GroupId = groupId });
+
+            _logger.LogInformation("User {UserId} marked group {GroupId} as read", userId, groupId);
+        }
+
         #endregion
 
         /// <summary>

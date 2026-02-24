@@ -1,6 +1,7 @@
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Groups;
 using MentorEdu.Models;
+using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
@@ -34,15 +35,21 @@ namespace MentorEdu.Services.Implementations
         {
             try
             {
+                Console.WriteLine($"[GroupService] Creating group for mentorId: {mentorId}, Name: {dto.Name}");
+                
                 // Verify mentor exists
                 var mentor = await _userRepository.GetByIdWithProfilesAsync(mentorId);
                 if (mentor == null)
                 {
+                    Console.WriteLine($"[GroupService] ERROR: Mentor not found with ID: {mentorId}");
                     return ServiceResult<GroupDto>.Failure("Mentor not found");
                 }
+                
+              
 
                 // Generate unique invite code
                 var inviteCode = await GenerateUniqueInviteCodeAsync();
+                Console.WriteLine($"[GroupService] Generated invite code: {inviteCode}");
 
                 var group = new Group
                 {
@@ -67,7 +74,9 @@ namespace MentorEdu.Services.Implementations
 
                 await _groupRepository.AddAsync(group);
                 // await _groupMemberRepository.AddAsync(mentorMember); // REMOVED: Managed by navigation
+                Console.WriteLine($"[GroupService] Saving group to database...");
                 await _unitOfWork.SaveChangesAsync();
+                Console.WriteLine($"[GroupService] Group saved successfully with ID: {group.Id}");
 
                 // Manually attach properties to avoid reloading from DB
                 // This ensures we have the necessary navigation properties for mapping
@@ -76,11 +85,32 @@ namespace MentorEdu.Services.Implementations
                 mentorMember.User = mentor;
                 group.Members = new List<GroupMember> { mentorMember };
 
-                var groupDto = MapToGroupDto(group);
+                Console.WriteLine($"[GroupService] Mapping group to DTO...");
+                GroupDto groupDto;
+                try
+                {
+                    groupDto = await MapToGroupDtoAsync(group, mentorId);
+                    Console.WriteLine($"[GroupService] Mapping successful");
+                }
+                catch (Exception mapEx)
+                {
+                    Console.WriteLine($"[GroupService] MAPPING ERROR: {mapEx.Message}");
+                    Console.WriteLine($"[GroupService] StackTrace: {mapEx.StackTrace}");
+                    throw; // Re-throw to outer catch
+                }
+                
+                Console.WriteLine($"[GroupService] Group created successfully: ID={groupDto.Id}, Name={groupDto.Name}");
                 return ServiceResult<GroupDto>.SuccessResult(groupDto);
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"[GroupService] EXCEPTION: {ex.GetType().Name}");
+                Console.WriteLine($"[GroupService] Message: {ex.Message}");
+                Console.WriteLine($"[GroupService] StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"[GroupService] InnerException: {ex.InnerException.Message}");
+                }
                 return ServiceResult<GroupDto>.Failure($"Error creating group: {ex.Message}");
             }
         }
@@ -102,6 +132,10 @@ namespace MentorEdu.Services.Implementations
                     return ServiceResult<GroupDto>.Failure("You are already a member of this group");
                 }
 
+                // Get user info for system message
+                var user = await _userRepository.GetByIdWithProfilesAsync(userId);
+                var userName = user?.UserProfile?.FullName ?? user?.Email ?? "Someone";
+
                 var member = new GroupMember
                 {
                     GroupId = group.Id,
@@ -111,6 +145,18 @@ namespace MentorEdu.Services.Implementations
                 };
 
                 await _groupMemberRepository.AddAsync(member);
+                
+                // Create system message for member joined
+                var systemMessage = new GroupMessage
+                {
+                    GroupId = group.Id,
+                    SenderId = userId,
+                    Content = $"{userName} đã tham gia nhóm",
+                    MessageType = MessageType.System,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _groupMessageRepository.AddAsync(systemMessage);
+                
                 await _unitOfWork.SaveChangesAsync();
 
                 // Reload group with updated members
@@ -120,12 +166,83 @@ namespace MentorEdu.Services.Implementations
                     return ServiceResult<GroupDto>.Failure("Failed to retrieve group");
                 }
 
-                var groupDto = MapToGroupDto(updatedGroup);
+                var groupDto = await MapToGroupDtoAsync(updatedGroup, userId);
                 return ServiceResult<GroupDto>.SuccessResult(groupDto);
             }
             catch (Exception ex)
             {
                 return ServiceResult<GroupDto>.Failure($"Error joining group: {ex.Message}");
+            }
+        }
+
+        public async Task<ServiceResult<GroupDto>> AddMemberAsync(long adminId, long groupId, long userId)
+        {
+            try
+            {
+                var group = await _groupRepository.GetByIdAsync(groupId);
+                if (group == null)
+                {
+                    return ServiceResult<GroupDto>.Failure("Group not found");
+                }
+
+                // Check if admin has permission
+                var adminMember = await _groupMemberRepository.GetMemberAsync(groupId, adminId);
+                if (adminMember == null || adminMember.Role != GroupRole.Admin)
+                {
+                    return ServiceResult<GroupDto>.Failure("Only group admin can add members");
+                }
+
+                // Check if user is already a member
+                var existingMember = await _groupMemberRepository.GetMemberAsync(groupId, userId);
+                if (existingMember != null)
+                {
+                    return ServiceResult<GroupDto>.Failure("User is already a member of this group");
+                }
+
+                // Get user info for system message
+                var user = await _userRepository.GetByIdWithProfilesAsync(userId);
+                if (user == null)
+                {
+                    return ServiceResult<GroupDto>.Failure("User not found");
+                }
+                var userName = user.UserProfile?.FullName ?? user.Email ?? "Someone";
+
+                // Add new member
+                var member = new GroupMember
+                {
+                    GroupId = groupId,
+                    UserId = userId,
+                    Role = GroupRole.Member,
+                    JoinedAt = DateTime.UtcNow
+                };
+                await _groupMemberRepository.AddAsync(member);
+
+                // Create system message for member added
+                var systemMessage = new GroupMessage
+                {
+                    GroupId = groupId,
+                    SenderId = adminId,
+                    Content = $"{userName} đã được thêm vào nhóm",
+                    MessageType = MessageType.System,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _groupMessageRepository.AddAsync(systemMessage);
+
+                await _unitOfWork.SaveChangesAsync();
+
+                // Reload group with updated members
+                var updatedGroup = await _groupRepository.GetByIdAsync(groupId);
+                if (updatedGroup == null)
+                {
+                    return ServiceResult<GroupDto>.Failure("Failed to retrieve group");
+                }
+
+                var groupDto = await MapToGroupDtoAsync(updatedGroup, adminId);
+                return ServiceResult<GroupDto>.SuccessResult(groupDto);
+            }
+            catch (Exception ex)
+            {
+                return ServiceResult<GroupDto>.Failure($"Error adding member: {ex.Message}");
             }
         }
 
@@ -139,7 +256,7 @@ namespace MentorEdu.Services.Implementations
                     return ServiceResult<GroupDto>.Failure("Group not found");
                 }
 
-                var groupDto = MapToGroupDto(group);
+                var groupDto = await MapToGroupDtoAsync(group);
                 return ServiceResult<GroupDto>.SuccessResult(groupDto);
             }
             catch (Exception ex)
@@ -153,7 +270,11 @@ namespace MentorEdu.Services.Implementations
             try
             {
                 var groups = await _groupRepository.GetGroupsByUserIdAsync(userId);
-                var groupDtos = groups.Select(MapToGroupDto).ToList();
+                var groupDtos = new List<GroupDto>();
+                foreach (var g in groups)
+                {
+                    groupDtos.Add(await MapToGroupDtoAsync(g, userId));
+                }
                 return ServiceResult<List<GroupDto>>.SuccessResult(groupDtos);
             }
             catch (Exception ex)
@@ -185,8 +306,8 @@ namespace MentorEdu.Services.Implementations
                 await _groupMessageRepository.AddAsync(message);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Reload to get navigation properties
-                var savedMessage = await _groupMessageRepository.GetByIdAsync(message.Id);
+                // Reload to get navigation properties (sender info)
+                var savedMessage = await _groupMessageRepository.GetByIdWithSenderAsync(message.Id);
                 if (savedMessage == null)
                 {
                     return ServiceResult<GroupMessageDto>.Failure("Failed to retrieve sent message");
@@ -201,7 +322,7 @@ namespace MentorEdu.Services.Implementations
             }
         }
 
-        public async Task<ServiceResult<List<GroupMessageDto>>> GetGroupMessagesAsync(long groupId, long userId, int pageNumber = 1, int pageSize = 50)
+        public async Task<ServiceResult<object>> GetGroupMessagesAsync(long groupId, long userId, int pageNumber = 1, int pageSize = 50)
         {
             try
             {
@@ -209,16 +330,27 @@ namespace MentorEdu.Services.Implementations
                 var isMember = await _groupMemberRepository.IsMemberAsync(groupId, userId);
                 if (!isMember)
                 {
-                    return ServiceResult<List<GroupMessageDto>>.Failure("You do not have access to this group");
+                    return ServiceResult<object>.Failure("You do not have access to this group");
                 }
 
+                var totalCount = await _groupMessageRepository.GetMessageCountAsync(groupId);
                 var messages = await _groupMessageRepository.GetMessagesByGroupIdAsync(groupId, pageNumber, pageSize);
                 var messageDtos = messages.Select(MapToGroupMessageDto).ToList();
-                return ServiceResult<List<GroupMessageDto>>.SuccessResult(messageDtos);
+
+                var result = new
+                {
+                    Messages = messageDtos,
+                    TotalCount = totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    HasMore = (pageNumber * pageSize) < totalCount
+                };
+
+                return ServiceResult<object>.SuccessResult(result);
             }
             catch (Exception ex)
             {
-                return ServiceResult<List<GroupMessageDto>>.Failure($"Error retrieving messages: {ex.Message}");
+                return ServiceResult<object>.Failure($"Error retrieving messages: {ex.Message}");
             }
         }
 
@@ -251,6 +383,20 @@ namespace MentorEdu.Services.Implementations
                     return ServiceResult<bool>.Failure("Group admin cannot leave the group");
                 }
 
+                // Get user name for system message
+                var userName = member.User?.UserProfile?.FullName ?? member.User?.Email ?? "Unknown";
+
+                // Create system message before removing member
+                var systemMessage = new GroupMessage
+                {
+                    GroupId = groupId,
+                    SenderId = userId,
+                    Content = $"{userName} đã rời nhóm",
+                    MessageType = MessageType.System,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _groupMessageRepository.AddAsync(systemMessage);
+
                 await _groupMemberRepository.DeleteAsync(member);
                 await _unitOfWork.SaveChangesAsync();
 
@@ -263,6 +409,12 @@ namespace MentorEdu.Services.Implementations
         }
 
         #region Private Helper Methods
+
+        public async Task MarkGroupAsReadAsync(long groupId, long userId)
+        {
+            await _groupMemberRepository.UpdateLastReadAtAsync(groupId, userId);
+            await _unitOfWork.SaveChangesAsync();
+        }
 
         private async Task<string> GenerateUniqueInviteCodeAsync()
         {
@@ -286,16 +438,49 @@ namespace MentorEdu.Services.Implementations
                 .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
-        private GroupDto MapToGroupDto(Group group)
+        private async Task<GroupDto> MapToGroupDtoAsync(Group group, long? userId = null)
         {
+            Console.WriteLine($"[MapToGroupDto] Starting - GroupId: {group?.Id}, Name: {group?.Name}");
+            Console.WriteLine($"[MapToGroupDto] Mentor: {(group?.Mentor != null ? "not null" : "NULL")}");
+            Console.WriteLine($"[MapToGroupDto] Mentor.UserProfile: {(group?.Mentor?.UserProfile != null ? "not null" : "NULL")}");
+            Console.WriteLine($"[MapToGroupDto] Members count: {group?.Members?.Count ?? 0}");
+            
+            // Get latest message for preview
+            var latestMessage = await _groupMessageRepository.GetLatestMessageByGroupIdAsync(group.Id);
+            
+            // Format lastMessage based on messageType
+            string displayMessage = latestMessage?.Content;
+            if (latestMessage != null)
+            {
+                if (latestMessage.MessageType == MentorEdu.Models.Enums.MessageType.Image)
+                {
+                    displayMessage = "📷 Ảnh";
+                }
+                else if (latestMessage.MessageType == MentorEdu.Models.Enums.MessageType.File)
+                {
+                    displayMessage = "📄 File";
+                }
+            }
+
+            // Compute unread count if userId is provided
+            int unreadCount = 0;
+            if (userId.HasValue)
+            {
+                var member = group.Members?.FirstOrDefault(m => m.UserId == userId.Value);
+                if (member != null)
+                {
+                    unreadCount = await _groupMessageRepository.GetUnreadCountAsync(group.Id, userId.Value, member.LastReadAt);
+                }
+            }
+            
             return new GroupDto
             {
                 Id = group.Id,
-                Name = group.Name,
+                Name = group.Name ?? string.Empty,
                 Description = group.Description,
                 MentorId = group.MentorId,
                 MentorName = group.Mentor?.UserProfile?.FullName ?? group.Mentor?.Email ?? "Unknown",
-                InviteCode = group.InviteCode,
+                InviteCode = group.InviteCode ?? string.Empty,
                 CreatedAt = group.CreatedAt,
                 MemberCount = group.Members?.Count ?? 0,
                 Members = group.Members?.Select(m => new GroupMemberDto
@@ -305,7 +490,11 @@ namespace MentorEdu.Services.Implementations
                     AvatarUrl = m.User?.UserProfile?.AvatarUrl,
                     Role = m.Role.ToString(),
                     JoinedAt = m.JoinedAt
-                }).ToList() ?? new List<GroupMemberDto>()
+                }).ToList() ?? new List<GroupMemberDto>(),
+                LastMessage = displayMessage,
+                LastMessageSender = latestMessage?.Sender?.UserProfile?.FullName ?? latestMessage?.Sender?.Email,
+                LastMessageAt = latestMessage?.CreatedAt,
+                UnreadCount = unreadCount
             };
         }
 

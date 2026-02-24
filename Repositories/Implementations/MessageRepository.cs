@@ -53,6 +53,15 @@ namespace MentorEdu.Repositories.Implementations
                 .CountAsync();
         }
 
+        public async Task<int> GetUnreadCountByConversationAsync(long conversationId, long userId)
+        {
+            return await _dbSet
+                .Where(m => m.ConversationId == conversationId &&
+                       !m.IsRead &&
+                       m.SenderId != userId)
+                .CountAsync();
+        }
+
         public async Task MarkAsReadAsync(long conversationId, long userId)
         {
             var unreadMessages = await _dbSet

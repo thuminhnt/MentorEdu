@@ -11,6 +11,12 @@ namespace MentorEdu.DTOs.Groups
         public DateTime CreatedAt { get; set; }
         public int MemberCount { get; set; }
         public List<GroupMemberDto> Members { get; set; } = new();
+        
+        // Latest message info for preview
+        public string? LastMessage { get; set; }
+        public string? LastMessageSender { get; set; }
+        public DateTime? LastMessageAt { get; set; }
+        public int UnreadCount { get; set; }
     }
 
     public class GroupMemberDto
