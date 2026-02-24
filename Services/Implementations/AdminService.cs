@@ -1716,6 +1716,63 @@ namespace MentorEdu.Services.Implementations
                 RejectionReason = mentorProfile.RejectionReason
             };
 
+            // Get the latest AI analysis from application history
+            var latestHistory = await _unitOfWork.MentorApplicationHistories.Query()
+                .Where(h => h.UserId == userId && h.AiConfidenceScore != null)
+                .OrderByDescending(h => h.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (latestHistory != null)
+            {
+                dto.AiConfidenceScore = latestHistory.AiConfidenceScore;
+                dto.AiModelVersion = latestHistory.AiModelVersion;
+                dto.IsAiReviewed = true;
+
+                // Parse ApplicationSnapshot to extract AI analysis details
+                if (!string.IsNullOrEmpty(latestHistory.ApplicationSnapshot))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(latestHistory.ApplicationSnapshot);
+                        if (doc.RootElement.TryGetProperty("AiAnalysis", out var aiAnalysis) && 
+                            aiAnalysis.ValueKind != JsonValueKind.Null)
+                        {
+                            if (aiAnalysis.TryGetProperty("AiRecommendedAction", out var actionProp))
+                                dto.AiRecommendedAction = actionProp.GetString();
+                            
+                            if (aiAnalysis.TryGetProperty("AiReasoning", out var reasoningProp))
+                                dto.AiReasoning = reasoningProp.GetString();
+                            
+                            if (aiAnalysis.TryGetProperty("AiKeyPoints", out var keyPointsProp))
+                            {
+                                dto.AiKeyPoints = new List<string>();
+                                foreach (var point in keyPointsProp.EnumerateArray())
+                                {
+                                    var value = point.GetString();
+                                    if (!string.IsNullOrWhiteSpace(value))
+                                        dto.AiKeyPoints.Add(value);
+                                }
+                            }
+                            
+                            if (aiAnalysis.TryGetProperty("AiRedFlags", out var redFlagsProp))
+                            {
+                                dto.AiRedFlags = new List<string>();
+                                foreach (var flag in redFlagsProp.EnumerateArray())
+                                {
+                                    var value = flag.GetString();
+                                    if (!string.IsNullOrWhiteSpace(value))
+                                        dto.AiRedFlags.Add(value);
+                                }
+                            }
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // Ignore JSON parsing errors - AI fields will remain null
+                    }
+                }
+            }
+
             return ServiceResult<MentorApplicationDto>.SuccessResult(dto);
         }
 

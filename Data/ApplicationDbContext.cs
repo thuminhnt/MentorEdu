@@ -66,6 +66,9 @@ namespace MentorEdu.Data
         // Mentor Application History (for audit trail and ML training)
         public DbSet<MentorApplicationHistory> MentorApplicationHistories { get; set; }
 
+        // AI Chatbot
+        public DbSet<AIChat> AIChats { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -111,6 +114,7 @@ namespace MentorEdu.Data
             modelBuilder.Entity<UserFollow>().ToTable("user_follows");
             modelBuilder.Entity<VerificationToken>().ToTable("verification_tokens");
             modelBuilder.Entity<MentorApplicationHistory>().ToTable("mentor_application_history");
+            modelBuilder.Entity<AIChat>().ToTable("ai_chats");
 
             // User - Unique Email
             modelBuilder.Entity<User>()
@@ -200,6 +204,22 @@ namespace MentorEdu.Data
 
             modelBuilder.Entity<MentorApplicationHistory>()
                 .HasIndex(h => h.CreatedAt);
+
+            // AIChat configuration
+            modelBuilder.Entity<AIChat>()
+                .HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<AIChat>()
+                .HasIndex(c => c.SessionId);
+
+            modelBuilder.Entity<AIChat>()
+                .HasIndex(c => c.UserId);
+
+            modelBuilder.Entity<AIChat>()
+                .HasIndex(c => c.CreatedAt);
 
             // UserProfile - One-to-One with User
             modelBuilder.Entity<UserProfile>()

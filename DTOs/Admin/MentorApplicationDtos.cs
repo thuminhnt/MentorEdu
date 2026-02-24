@@ -30,6 +30,15 @@ namespace MentorEdu.DTOs.Admin
         public DateTime? ReviewedAt { get; set; }
         public string? ReviewedByName { get; set; }
         public string? RejectionReason { get; set; }
+
+        // AI Analysis fields
+        public decimal? AiConfidenceScore { get; set; }
+        public string? AiRecommendedAction { get; set; }
+        public string? AiReasoning { get; set; }
+        public List<string>? AiKeyPoints { get; set; }
+        public List<string>? AiRedFlags { get; set; }
+        public string? AiModelVersion { get; set; }
+        public bool IsAiReviewed { get; set; }
     }
     
     public class CategorySimpleDto

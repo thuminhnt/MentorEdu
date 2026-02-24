@@ -180,6 +180,7 @@ builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
 builder.Services.AddScoped<IGroupRepository, GroupRepository>();
 builder.Services.AddScoped<IGroupMemberRepository, GroupMemberRepository>();
 builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
+builder.Services.AddScoped<IAIChatRepository, AIChatRepository>();
 // =======================
 // UNIT OF WORK
 // =======================
@@ -193,6 +194,8 @@ builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Emai
 // =======================
 // SERVICES
 // =======================
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IGeminiAiService, GeminiAiService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -206,6 +209,7 @@ builder.Services.AddScoped<ICommunityService, CommunityService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<IAIChatService, AIChatService>();
 
 // =======================
 // APP
