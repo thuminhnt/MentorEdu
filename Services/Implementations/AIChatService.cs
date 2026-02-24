@@ -37,8 +37,8 @@ namespace MentorEdu.Services.Implementations
             };
             await _chatRepository.CreateAsync(userMessage);
 
-            // Get conversation history for context
-            var recentMessages = await _chatRepository.GetRecentMessagesAsync(sessionId, 10);
+            // Get conversation history for context (limited to 4 messages to save quota)
+            var recentMessages = await _chatRepository.GetRecentMessagesAsync(sessionId, 4);
             var conversationHistory = recentMessages
                 .Where(m => m.Id != userMessage.Id) // Exclude current message
                 .Select(m => new ChatMessage
@@ -57,7 +57,14 @@ namespace MentorEdu.Services.Implementations
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting AI response");
-                aiResponseText = "Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau.";
+                if (ex.Message.Contains("RATE_LIMITED"))
+                {
+                    aiResponseText = "The AI ​​is busy, please try again in a few seconds.";
+                }
+                else
+                {
+                    aiResponseText = "Sorry, I'm experiencing a technical issue. Please try again later.";
+                }
             }
 
             // Save AI response
