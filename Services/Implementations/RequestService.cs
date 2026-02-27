@@ -50,7 +50,7 @@ namespace MentorEdu.Services.Implementations
         public async Task<ServiceResult<RequestDetailDto>> CreateRequestAsync(long studentId, CreateRequestDto request)
         {
             // Validate student
-            var student = await _unitOfWork.Users.GetByIdAsync(studentId);
+            var student = await _unitOfWork.Users.GetByIdWithProfilesAsync(studentId);
             if (student == null || student.Role != UserRole.Student)
                 return ServiceResult<RequestDetailDto>.FailResult("Only students can create requests");
 
@@ -152,6 +152,19 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.SaveChangesAsync();
             }
 
+            // Send notification to mentor if request is directed to a specific mentor
+            if (request.MentorId.HasValue)
+            {
+                var studentName = student.UserProfile?.FullName ?? student.Email ?? "A student";
+                await _notificationService.CreateNotificationAsync(
+                    request.MentorId.Value,
+                    NotificationType.RequestCreated,
+                    "New Request",
+                    $"{studentName} sent you a request: '{request.Title}'",
+                    $"{{\"requestId\":{newRequest.Id}}}"
+                );
+            }
+
             return await GetByIdAsync(newRequest.Id);
         }
 
@@ -242,14 +255,14 @@ namespace MentorEdu.Services.Implementations
                     }
                 }
 
-                // Soft delete
-                request.Status = RequestStatus.Deleted;
+                // Cancel the request
+                request.Status = RequestStatus.Cancelled;
                 request.UpdatedAt = DateTime.UtcNow;
                 _unitOfWork.Requests.Update(request);
 
                 await _unitOfWork.SaveChangesAsync();
 
-                return ServiceResult.SuccessResult("Request deleted and funds refunded successfully");
+                return ServiceResult.SuccessResult("Request cancelled and funds refunded successfully");
             });
         }
 

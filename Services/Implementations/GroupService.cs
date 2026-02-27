@@ -151,7 +151,7 @@ namespace MentorEdu.Services.Implementations
                 {
                     GroupId = group.Id,
                     SenderId = userId,
-                    Content = $"{userName} đã tham gia nhóm",
+                    Content = $"{userName} joined the group",
                     MessageType = MessageType.System,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -222,7 +222,7 @@ namespace MentorEdu.Services.Implementations
                 {
                     GroupId = groupId,
                     SenderId = adminId,
-                    Content = $"{userName} đã được thêm vào nhóm",
+                    Content = $"{userName} was added to the group",
                     MessageType = MessageType.System,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -391,7 +391,7 @@ namespace MentorEdu.Services.Implementations
                 {
                     GroupId = groupId,
                     SenderId = userId,
-                    Content = $"{userName} đã rời nhóm",
+                    Content = $"{userName} left the group",
                     MessageType = MessageType.System,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -454,7 +454,7 @@ namespace MentorEdu.Services.Implementations
             {
                 if (latestMessage.MessageType == MentorEdu.Models.Enums.MessageType.Image)
                 {
-                    displayMessage = "📷 Ảnh";
+                    displayMessage = "📷 Photo";
                 }
                 else if (latestMessage.MessageType == MentorEdu.Models.Enums.MessageType.File)
                 {

@@ -17,6 +17,7 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<CommunityCommentDto>> CreateCommentAsync(long userId, CreateCommentDto request);
         Task<ServiceResult> DeleteCommentAsync(long commentId, long userId);
         Task<ServiceResult<List<CommunityCommentDto>>> GetCommentsByPostAsync(long postId);
+        Task<ServiceResult<PagedResponse<CommunityCommentDto>>> GetCommentsByPostPagedAsync(long postId, int pageNumber = 1, int pageSize = 10);
         
         // Featured
         Task<ServiceResult<List<CommunityPostListDto>>> GetRecentPostsAsync(int count = 10, long? currentUserId = null);
