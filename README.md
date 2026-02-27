@@ -23,33 +23,7 @@ dotnet restore
 
 Các API key **không lưu trong `appsettings.json`** mà dùng `dotnet user-secrets` để bảo mật.
 
-Chạy lần lượt các lệnh sau trong folder `MentorEdu/`:
-
-```bash
-# Email (SendGrid)
-dotnet user-secrets set "EmailSettings:SendGridApiKey" "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"
-dotnet user-secrets set "EmailSettings:SenderEmail" "nguyentranminhthu233@gmail.com"
-dotnet user-secrets set "EmailSettings:SenderName" "EduMentor"
-
-# Google OAuth
-dotnet user-secrets set "Authentication:Google:ClientId" "94658155587-f3l3m1o4pp7pa35n6c0nlfhsmhao3f6e.apps.googleusercontent.com"
-dotnet user-secrets set "Authentication:Google:ClientSecret" "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"
-
-# Gemini AI
-dotnet user-secrets set "GeminiAI:ApiKey" "AIzaSyAZkshDVoMsTnadt0ZS_Kax2dTiEdzDp8o"
-dotnet user-secrets set "GeminiAI:ChatApiKey" "AIzaSyC8prr9wxL4Lp4bb4A0Y_fQrbLGIEsyX5U"
-
-# MoMo Sandbox
-dotnet user-secrets set "MoMo:AccessKey" "klm05TvNBzhg7h7j"
-dotnet user-secrets set "MoMo:SecretKey" "at67qH6mk8w5Y1nAyMoYKMWACiEi2bsa"
-
-# VNPay Sandbox
-dotnet user-secrets set "VNPay:TmnCode" "UHRQ3XGS"
-dotnet user-secrets set "VNPay:HashSecret" "YK8CXPM7WQH8E0ABVSC8KRE4EBK3SXMO"
-
-# JWT
-dotnet user-secrets set "Jwt:Key" "MentorEduSecretKey123456789012345678901234567890"
-```
+Chạy lần lượt các lệnh trong file key-secrets vào trong folder `MentorEdu/`.
 
 > Kiểm tra lại: `dotnet user-secrets list`
 
