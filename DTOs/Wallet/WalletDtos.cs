@@ -127,6 +127,13 @@ namespace MentorEdu.DTOs.Wallet
         public decimal Amount { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
         public DateTime ExpireAt { get; set; }
+
+        // VietQR bank transfer fields
+        public string? QrCodeUrl { get; set; }
+        public string? BankId { get; set; }
+        public string? AccountNo { get; set; }
+        public string? AccountName { get; set; }
+        public string? TransferDescription { get; set; }
     }
 
     /// <summary>

@@ -37,8 +37,8 @@ namespace MentorEdu.Services.Implementations
             };
             await _chatRepository.CreateAsync(userMessage);
 
-            // Get conversation history for context (limited to 4 messages to save quota)
-            var recentMessages = await _chatRepository.GetRecentMessagesAsync(sessionId, 4);
+            // Get conversation history for context (limited to 2 messages to save quota)
+            var recentMessages = await _chatRepository.GetRecentMessagesAsync(sessionId, 2);
             var conversationHistory = recentMessages
                 .Where(m => m.Id != userMessage.Id) // Exclude current message
                 .Select(m => new ChatMessage

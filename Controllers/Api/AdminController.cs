@@ -812,6 +812,22 @@ namespace MentorEdu.Controllers.Api
             return Ok(ApiResponse.SuccessResponse(result.Message));
         }
 
+        /// <summary>
+        /// Re-evaluate a pending mentor application using AI
+        /// Triggers a new AI analysis on the existing application data
+        /// </summary>
+        [HttpPost("mentor-applications/{userId}/re-evaluate")]
+        public async Task<ActionResult<ApiResponse<MentorApplicationDto>>> ReEvaluateMentorApplication(long userId)
+        {
+            var adminId = GetCurrentUserId();
+            var result = await _adminService.ReEvaluateMentorApplicationAsync(userId, adminId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<MentorApplicationDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<MentorApplicationDto>.SuccessResponse(result.Data!, result.Message));
+        }
+
         #endregion
 
         #region Mentor Application History
