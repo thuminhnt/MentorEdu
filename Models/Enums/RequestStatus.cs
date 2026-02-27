@@ -8,6 +8,7 @@ namespace MentorEdu.Models.Enums
         Matched,    // Legacy - used for proposal matching
         InOrder,    // Request has an active order
         Closed,     // Closed by student
-        Deleted     // Soft deleted
+        Deleted,    // Soft deleted
+        Cancelled   // Cancelled by student
     }
 }

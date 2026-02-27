@@ -159,14 +159,17 @@ namespace MentorEdu.Controllers.Api
         /// Get comments for a post
         /// </summary>
         [HttpGet("posts/{postId}/comments")]
-        public async Task<ActionResult<ApiResponse<List<CommunityCommentDto>>>> GetComments(long postId)
+        public async Task<ActionResult<ApiResponse<PagedResponse<CommunityCommentDto>>>> GetComments(
+            long postId,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var result = await _communityService.GetCommentsByPostAsync(postId);
+            var result = await _communityService.GetCommentsByPostPagedAsync(postId, pageNumber, pageSize);
 
             if (!result.Success)
-                return StatusCode(result.StatusCode, ApiResponse<List<CommunityCommentDto>>.FailResponse(result.Message ?? ""));
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<CommunityCommentDto>>.FailResponse(result.Message ?? ""));
 
-            return Ok(ApiResponse<List<CommunityCommentDto>>.SuccessResponse(result.Data!));
+            return Ok(ApiResponse<PagedResponse<CommunityCommentDto>>.SuccessResponse(result.Data!));
         }
 
         /// <summary>

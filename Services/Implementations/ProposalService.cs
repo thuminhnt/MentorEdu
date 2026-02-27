@@ -35,7 +35,7 @@ namespace MentorEdu.Services.Implementations
         public async Task<ServiceResult<ProposalDetailDto>> CreateProposalAsync(long mentorId, CreateProposalDto request)
         {
             // Validate mentor
-            var mentor = await _unitOfWork.Users.GetByIdAsync(mentorId);
+            var mentor = await _unitOfWork.Users.GetByIdWithProfilesAsync(mentorId);
             if (mentor == null || mentor.Role != UserRole.Mentor)
                 return ServiceResult<ProposalDetailDto>.FailResult("Only mentors can submit proposals");
 
@@ -75,7 +75,18 @@ namespace MentorEdu.Services.Implementations
 
             await _unitOfWork.SaveChangesAsync();
 
-            // TODO: Send notification to student
+            // Send notification to request owner (student)
+            if (requestEntity.StudentId > 0)
+            {
+                var mentorName = mentor.UserProfile?.FullName ?? mentor.Email ?? "A mentor";
+                await _notificationService.CreateNotificationAsync(
+                    requestEntity.StudentId,
+                    NotificationType.NewProposal,
+                    "New Proposal",
+                    $"{mentorName} submitted a proposal for your request: '{requestEntity.Title}'",
+                    $"{{\"requestId\":{requestEntity.Id},\"proposalId\":{proposal.Id}}}"
+                );
+            }
 
             return await GetByIdAsync(proposal.Id);
         }

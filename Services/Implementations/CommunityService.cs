@@ -1,10 +1,12 @@
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Community;
+using MentorEdu.Hubs;
 using MentorEdu.Models;
 using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace MentorEdu.Services.Implementations
@@ -12,10 +14,12 @@ namespace MentorEdu.Services.Implementations
     public class CommunityService : BaseService, ICommunityService
     {
         private readonly INotificationService _notificationService;
+        private readonly IHubContext<ChatHub> _hubContext;
 
-        public CommunityService(IUnitOfWork unitOfWork, INotificationService notificationService) : base(unitOfWork)
+        public CommunityService(IUnitOfWork unitOfWork, INotificationService notificationService, IHubContext<ChatHub> hubContext) : base(unitOfWork)
         {
             _notificationService = notificationService;
+            _hubContext = hubContext;
         }
 
         #region Posts
@@ -268,6 +272,9 @@ namespace MentorEdu.Services.Implementations
                 ParentCommentId = comment.ParentCommentId
             };
 
+            // Broadcast new comment to all users viewing this post in real-time
+            await _hubContext.Clients.Group($"post_{request.PostId}").SendAsync("NewComment", dto);
+
             return ServiceResult<CommunityCommentDto>.CreatedResult(dto, "Comment posted successfully");
         }
 
@@ -286,6 +293,13 @@ namespace MentorEdu.Services.Implementations
 
             _unitOfWork.CommunityComments.Remove(comment);
             await _unitOfWork.SaveChangesAsync();
+
+            // Broadcast comment deletion to all users viewing this post in real-time
+            await _hubContext.Clients.Group($"post_{comment.PostId}").SendAsync("CommentDeleted", new
+            {
+                commentId = comment.Id,
+                postId = comment.PostId
+            });
 
             return ServiceResult.SuccessResult("Comment deleted successfully");
         }
@@ -315,6 +329,33 @@ namespace MentorEdu.Services.Implementations
             }
 
             return ServiceResult<List<CommunityCommentDto>>.SuccessResult(parentComments);
+        }
+
+        public async Task<ServiceResult<PagedResponse<CommunityCommentDto>>> GetCommentsByPostPagedAsync(long postId, int pageNumber = 1, int pageSize = 10)
+        {
+            var (comments, totalCount) = await _unitOfWork.CommunityComments.GetPagedByPostIdAsync(postId, pageNumber, pageSize);
+
+            var allDtos = comments.Select(c => new CommunityCommentDto
+            {
+                Id = c.Id,
+                Content = c.Content,
+                CreatedAt = c.CreatedAt,
+                AuthorId = c.AuthorId,
+                AuthorName = c.Author?.UserProfile?.FullName,
+                AuthorAvatar = c.Author?.UserProfile?.AvatarUrl,
+                IsAuthorMentor = c.Author?.Role == UserRole.Mentor,
+                ParentCommentId = c.ParentCommentId
+            }).ToList();
+
+            // Build nested tree
+            var parentComments = allDtos.Where(c => c.ParentCommentId == null).ToList();
+            foreach (var parent in parentComments)
+            {
+                BuildCommentTree(parent, allDtos);
+            }
+
+            var response = PagedResponse<CommunityCommentDto>.Create(parentComments, pageNumber, pageSize, totalCount);
+            return ServiceResult<PagedResponse<CommunityCommentDto>>.SuccessResult(response);
         }
 
         private void BuildCommentTree(CommunityCommentDto parent, List<CommunityCommentDto> allComments)

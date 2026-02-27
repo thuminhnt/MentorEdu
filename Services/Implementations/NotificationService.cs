@@ -1,17 +1,22 @@
 using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Notification;
+using MentorEdu.Hubs;
 using MentorEdu.Models;
 using MentorEdu.Models.Enums;
 using MentorEdu.Repositories.Interfaces;
 using MentorEdu.Services.Common;
 using MentorEdu.Services.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 
 namespace MentorEdu.Services.Implementations
 {
     public class NotificationService : BaseService, INotificationService
     {
-        public NotificationService(IUnitOfWork unitOfWork) : base(unitOfWork)
+        private readonly IHubContext<ChatHub> _hubContext;
+
+        public NotificationService(IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext) : base(unitOfWork)
         {
+            _hubContext = hubContext;
         }
 
         public async Task<ServiceResult<PagedResponse<NotificationDto>>> GetNotificationsAsync(long userId, SearchNotificationDto searchDto)
@@ -79,6 +84,9 @@ namespace MentorEdu.Services.Implementations
 
             await _unitOfWork.Notifications.AddAsync(notification);
             await _unitOfWork.SaveChangesAsync();
+
+            // Push real-time notification via SignalR
+            await PushNotificationToUserAsync(notification);
 
             return ServiceResult.SuccessResult("Notification created successfully");
         }
@@ -181,10 +189,39 @@ namespace MentorEdu.Services.Implementations
 
             await _unitOfWork.SaveChangesAsync();
 
+            // Push real-time notifications to all relevant mentors
+            foreach (var mentorId in mentorIds)
+            {
+                var unreadCount = await _unitOfWork.Notifications.GetUnreadCountByUserIdAsync(mentorId);
+                await _hubContext.Clients.Group($"user_{mentorId}").SendAsync("NewNotification", new
+                {
+                    type = NotificationType.RelevantPost.ToString(),
+                    title = "New relevant post in your expertise area",
+                    body = $"A new post about {displayText} has been published that matches your specializations.",
+                    data = new { postId, categoryId, hashtags },
+                    totalUnread = unreadCount
+                });
+            }
+
             return ServiceResult.SuccessResult($"Notified {mentorIds.Count} mentor(s) about relevant post");
         }
 
         #region Private Methods
+
+        /// <summary>
+        /// Push a notification to a user in real-time via SignalR
+        /// </summary>
+        private async Task PushNotificationToUserAsync(Notification notification)
+        {
+            var unreadCount = await _unitOfWork.Notifications.GetUnreadCountByUserIdAsync(notification.UserId);
+            var dto = MapToDto(notification);
+
+            await _hubContext.Clients.Group($"user_{notification.UserId}").SendAsync("NewNotification", new
+            {
+                notification = dto,
+                totalUnread = unreadCount
+            });
+        }
 
         private NotificationDto MapToDto(Notification notification)
         {

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using MentorEdu.DTOs.Chat;
+using MentorEdu.Models.Enums;
 using MentorEdu.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -16,6 +17,7 @@ namespace MentorEdu.Hubs
         private readonly IWorkSessionService _workSessionService;
         private readonly IGroupService _groupService;
         private readonly ILogger<ChatHub> _logger;
+        private readonly INotificationService _notificationService;
 
         private readonly IOrderService _orderService;
 
@@ -24,13 +26,14 @@ namespace MentorEdu.Hubs
         private static readonly object _lock = new();
         private static readonly Dictionary<string, PendingWorkAction> _pendingWorkActions = new();
         private static readonly object _pendingWorkActionsLock = new();
-        public ChatHub(IChatService chatService, IWorkSessionService workSessionService, IGroupService groupService, IOrderService orderService, ILogger<ChatHub> logger)
+        public ChatHub(IChatService chatService, IWorkSessionService workSessionService, IGroupService groupService, IOrderService orderService, INotificationService notificationService, ILogger<ChatHub> logger)
         {
             _chatService = chatService;
             _logger = logger;
             _workSessionService = workSessionService;
             _groupService = groupService;
             _orderService = orderService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -48,6 +51,9 @@ namespace MentorEdu.Hubs
                     
                     _userConnections[userId].Add(Context.ConnectionId);
                 }
+
+                // Add user to personal group for real-time notifications
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
 
                 // Notify others that user is online
                 await Clients.Others.SendAsync("UserOnline", userId);
@@ -87,6 +93,28 @@ namespace MentorEdu.Hubs
             await base.OnDisconnectedAsync(exception);
         }
 
+        #region Community Post Rooms
+
+        /// <summary>
+        /// Join a community post room to receive real-time comments
+        /// </summary>
+        public async Task JoinPostRoom(long postId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"post_{postId}");
+            _logger.LogInformation("User {UserId} joined post room {PostId}", GetCurrentUserId(), postId);
+        }
+
+        /// <summary>
+        /// Leave a community post room
+        /// </summary>
+        public async Task LeavePostRoom(long postId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"post_{postId}");
+            _logger.LogInformation("User {UserId} left post room {PostId}", GetCurrentUserId(), postId);
+        }
+
+        #endregion
+
         /// <summary>
         /// Join a conversation room
         /// </summary>
@@ -106,6 +134,27 @@ namespace MentorEdu.Hubs
             
             // Mark messages as read when joining
             await _chatService.MarkMessagesAsReadAsync(conversationId, userId);
+            
+            // Check for any pending work actions targeting this user in this conversation
+            List<PendingWorkAction> pendingForUser;
+            lock (_pendingWorkActionsLock)
+            {
+                pendingForUser = _pendingWorkActions.Values
+                    .Where(a => a.TargetUserId == userId && a.ConversationId == conversationId)
+                    .ToList();
+            }
+
+            foreach (var pending in pendingForUser)
+            {
+                await Clients.Caller.SendAsync("WorkActionPopup", new
+                {
+                    requestId = pending.RequestId,
+                    actionType = pending.ActionType.ToString(),
+                    conversationId = pending.ConversationId,
+                    orderId = pending.OrderId,
+                    requestedByUserId = pending.RequestedByUserId
+                });
+            }
             
             _logger.LogInformation("User {UserId} joined conversation {ConversationId}", userId, conversationId);
         }
@@ -480,12 +529,30 @@ namespace MentorEdu.Hubs
                 return;
             }
 
-            // Find the other user
-            var otherUserId = conversation.Data.Mentor?.Id == userId ? conversation.Data.Student?.Id : conversation.Data.Mentor?.Id;
+            // Find the other user and requester name
+            var isMentor = conversation.Data.Mentor?.Id == userId;
+            var otherUserId = isMentor ? conversation.Data.Student?.Id : conversation.Data.Mentor?.Id;
+            var requesterName = isMentor
+                ? (conversation.Data.Mentor?.FullName ?? "Mentor")
+                : (conversation.Data.Student?.FullName ?? "Student");
             if (otherUserId == null)
             {
                  await Clients.Caller.SendAsync("Error", "Partner not found");
                  return;
+            }
+
+            // Prevent duplicate pending complete actions for the same conversation
+            lock (_pendingWorkActionsLock)
+            {
+                var existingAction = _pendingWorkActions.Values
+                    .FirstOrDefault(a => a.ConversationId == conversationId 
+                        && a.ActionType == WorkActionType.Complete);
+                if (existingAction != null)
+                {
+                    // Already has a pending complete request — don't create another
+                    Clients.Caller.SendAsync("Error", "A completion request is already pending").Wait();
+                    return;
+                }
             }
 
             var requestId = Guid.NewGuid().ToString("N");
@@ -507,6 +574,31 @@ namespace MentorEdu.Hubs
             {
                 _pendingWorkActions[requestId] = pendingAction;
             }
+
+            // Save a system message in the conversation so both users can see it in chat history
+            var systemContent = $"{requesterName} has requested to complete the order. Waiting for confirmation...";
+            var systemMsg = await _chatService.SendMessageAsync(userId, new SendMessageDto
+            {
+                ConversationId = conversationId,
+                Content = systemContent,
+                MessageType = MessageType.System
+            });
+
+            // Broadcast the system message to the conversation
+            if (systemMsg.Success && systemMsg.Data != null)
+            {
+                await Clients.Group($"conversation_{conversationId}")
+                    .SendAsync("ReceiveMessage", systemMsg.Data);
+            }
+
+            // Create a notification for the other user (works even if they're offline)
+            await _notificationService.CreateNotificationAsync(
+                otherUserId.Value,
+                NotificationType.OrderCompleted,
+                "Order Completion Request",
+                $"{requesterName} has requested to complete the order. Please open chat to respond.",
+                $"{{\"conversationId\":{conversationId},\"orderId\":{orderId}}}"
+            );
 
             await Clients.Group($"conversation_{conversationId}")
                 .SendAsync("WorkActionState", new
@@ -685,6 +777,20 @@ namespace MentorEdu.Hubs
                              await SendToUser(pendingAction.RequestedByUserId, "Error", completeResult.Message ?? "Failed to complete order");
                              await Clients.Caller.SendAsync("Error", completeResult.Message ?? "Failed to complete order");
                              return;
+                        }
+
+                        // Send a system message confirming order completion
+                        var completeSystemMsg = await _chatService.SendMessageAsync(userId, new SendMessageDto
+                        {
+                            ConversationId = pendingAction.ConversationId,
+                            Content = " Order has been completed successfully! Thank you for using EduMentor.",
+                            MessageType = MessageType.System
+                        });
+
+                        if (completeSystemMsg.Success && completeSystemMsg.Data != null)
+                        {
+                            await Clients.Group($"conversation_{pendingAction.ConversationId}")
+                                .SendAsync("ReceiveMessage", completeSystemMsg.Data);
                         }
 
                         await Clients.Group($"conversation_{pendingAction.ConversationId}")
