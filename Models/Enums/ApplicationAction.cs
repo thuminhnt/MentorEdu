@@ -10,6 +10,7 @@ namespace MentorEdu.Models.Enums
         Approved = 1,    // Admin approved the application
         Rejected = 2,    // Admin rejected the application
         AutoApproved = 3, // AI auto-approved (future)
-        AutoRejected = 4  // AI auto-rejected (future)
+        AutoRejected = 4, // AI auto-rejected (future)
+        AiReEvaluated = 5 // Admin triggered AI re-evaluation
     }
 }

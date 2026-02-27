@@ -16,10 +16,14 @@ namespace MentorEdu.Services.Implementations
     public class AdminService : BaseService, IAdminService
     {
         private readonly IEmailService _emailService;
+        private readonly IGeminiAiService _geminiAiService;
+        private readonly ILogger<AdminService> _logger;
 
-        public AdminService(IUnitOfWork unitOfWork, IEmailService emailService) : base(unitOfWork)
+        public AdminService(IUnitOfWork unitOfWork, IEmailService emailService, IGeminiAiService geminiAiService, ILogger<AdminService> logger) : base(unitOfWork)
         {
             _emailService = emailService;
+            _geminiAiService = geminiAiService;
+            _logger = logger;
         }
 
         #region Dashboard
@@ -1977,6 +1981,186 @@ namespace MentorEdu.Services.Implementations
             }
 
             return ServiceResult.SuccessResult("Mentor application rejected");
+        }
+
+        public async Task<ServiceResult<MentorApplicationDto>> ReEvaluateMentorApplicationAsync(long userId, long adminId)
+        {
+            var mentorProfile = await _unitOfWork.MentorProfiles.Query()
+                .Include(mp => mp.User).ThenInclude(u => u.UserProfile)
+                .Include(mp => mp.User).ThenInclude(u => u.MentorCategories).ThenInclude(mc => mc.Category)
+                .Include(mp => mp.User).ThenInclude(u => u.MentorHashtags).ThenInclude(mh => mh.Hashtag)
+                .FirstOrDefaultAsync(mp => mp.UserId == userId);
+
+            if (mentorProfile == null)
+                return ServiceResult<MentorApplicationDto>.NotFoundResult("Mentor application not found");
+
+            if (!_geminiAiService.IsConfigured())
+                return ServiceResult<MentorApplicationDto>.FailResult("AI service is not configured");
+
+            // Reconstruct the request from existing profile data
+            var request = new ApplyAsMentorRequest
+            {
+                Specialization = mentorProfile.Specialization ?? "",
+                ExperienceYears = mentorProfile.ExperienceYears ?? 0,
+                Introduction = mentorProfile.Introduction ?? "",
+                PortfolioUrl = mentorProfile.PortfolioUrl ?? "",
+                ApplicationNote = mentorProfile.ApplicationNote,
+                CertificationUrls = mentorProfile.CertificationUrls ?? "",
+                CategoryIds = mentorProfile.User?.MentorCategories?.Select(mc => mc.CategoryId).ToList() ?? new List<long>(),
+                HashtagIds = mentorProfile.User?.MentorHashtags?.Select(mh => mh.HashtagId).ToList() ?? new List<long>()
+            };
+
+            // Run AI analysis
+            GeminiAnalysisResult aiResult;
+            try
+            {
+                _logger.LogInformation("Admin {AdminId} triggered AI re-evaluation for user {UserId}", adminId, userId);
+                aiResult = await _geminiAiService.AnalyzeMentorApplicationAsync(userId, request, request.CertificationUrls);
+                _logger.LogInformation("AI re-evaluation for user {UserId}: Score={Score}, Action={Action}",
+                    userId, aiResult.ConfidenceScore, aiResult.RecommendedAction);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "AI re-evaluation failed for user {UserId}", userId);
+                return ServiceResult<MentorApplicationDto>.FailResult($"AI analysis failed: {ex.Message}");
+            }
+
+            // Get submission count
+            var submissionCount = await _unitOfWork.MentorApplicationHistories.GetSubmissionCountAsync(userId);
+
+            // Apply AI result
+            string resultMessage;
+            ApplicationAction historyAction = ApplicationAction.AiReEvaluated;
+            string? historyReason;
+
+            if (aiResult.RecommendedAction == "AUTO_APPROVE")
+            {
+                mentorProfile.ApprovalStatus = MentorApprovalStatus.Approved;
+                mentorProfile.ReviewedAt = DateTime.UtcNow;
+                mentorProfile.ReviewedBy = adminId;
+                mentorProfile.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.MentorProfiles.Update(mentorProfile);
+
+                historyReason = $"AI re-evaluation: Auto-approved (Score: {aiResult.ConfidenceScore}%). {aiResult.Reasoning}";
+                resultMessage = $"AI approved the application (Score: {aiResult.ConfidenceScore}%).";
+
+                // Create approval notification
+                var notification = new Notification
+                {
+                    UserId = userId,
+                    Type = NotificationType.System,
+                    Title = "Mentor Application Approved",
+                    Body = $"Your mentor application has been approved by AI review (Score: {aiResult.ConfidenceScore}%). Go to Profile to confirm switching to Mentor role.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Notifications.AddAsync(notification);
+            }
+            else if (aiResult.RecommendedAction == "AUTO_REJECT")
+            {
+                var redFlagsText = aiResult.RedFlags.Any()
+                    ? string.Join("; ", aiResult.RedFlags)
+                    : "Application did not meet minimum requirements";
+
+                mentorProfile.ApprovalStatus = MentorApprovalStatus.Rejected;
+                mentorProfile.ReviewedAt = DateTime.UtcNow;
+                mentorProfile.ReviewedBy = adminId;
+                mentorProfile.RejectionReason = $"AI review concerns: {redFlagsText}. You may reapply with improved credentials.";
+                mentorProfile.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.MentorProfiles.Update(mentorProfile);
+
+                historyReason = $"AI re-evaluation: Auto-rejected (Score: {aiResult.ConfidenceScore}%). Concerns: {redFlagsText}";
+                resultMessage = $"AI rejected the application (Score: {aiResult.ConfidenceScore}%). Concerns: {redFlagsText}";
+
+                // Create rejection notification
+                var notification = new Notification
+                {
+                    UserId = userId,
+                    Type = NotificationType.System,
+                    Title = "Mentor Application Rejected",
+                    Body = $"Your mentor application was rejected by AI review. Concerns: {redFlagsText}. You may reapply.",
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Notifications.AddAsync(notification);
+            }
+            else
+            {
+                // Still pending - manual review needed
+                historyReason = $"AI re-evaluation: Still pending manual review (Score: {aiResult.ConfidenceScore}%). {aiResult.Reasoning}";
+                resultMessage = $"AI scored the application at {aiResult.ConfidenceScore}%. Still requires manual review.";
+            }
+
+            // Save AI analysis data in history
+            var aiAnalysisData = new
+            {
+                AiConfidenceScore = aiResult.ConfidenceScore,
+                AiRecommendedAction = aiResult.RecommendedAction,
+                AiReasoning = aiResult.Reasoning,
+                AiKeyPoints = aiResult.KeyPoints,
+                AiRedFlags = aiResult.RedFlags,
+                AiModelVersion = aiResult.ModelVersion
+            };
+
+            var applicationSnapshot = JsonSerializer.Serialize(new
+            {
+                mentorProfile.Specialization,
+                mentorProfile.ExperienceYears,
+                mentorProfile.Introduction,
+                mentorProfile.PortfolioUrl,
+                mentorProfile.ApplicationNote,
+                AiAnalysis = aiAnalysisData
+            });
+
+            var history = new MentorApplicationHistory
+            {
+                UserId = userId,
+                Action = historyAction,
+                ApplicationSnapshot = applicationSnapshot,
+                CertificationUrls = mentorProfile.CertificationUrls,
+                Reason = historyReason,
+                AiConfidenceScore = aiResult.ConfidenceScore,
+                AiModelVersion = aiResult.ModelVersion,
+                SubmissionCount = submissionCount > 0 ? submissionCount : 1,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = adminId
+            };
+            await _unitOfWork.MentorApplicationHistories.AddAsync(history);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // Send email notification based on AI decision
+            if (mentorProfile.User != null)
+            {
+                var fullName = mentorProfile.User.UserProfile?.FullName ?? mentorProfile.User.Email;
+                try
+                {
+                    if (aiResult.RecommendedAction == "AUTO_APPROVE")
+                    {
+                        await _emailService.SendMentorApprovalNotificationAsync(mentorProfile.User.Email, fullName);
+                        _logger.LogInformation("Sent approval email after re-evaluation for user {UserId}", userId);
+                    }
+                    else if (aiResult.RecommendedAction == "AUTO_REJECT")
+                    {
+                        var rejectReason = aiResult.RedFlags.Any()
+                            ? string.Join("; ", aiResult.RedFlags)
+                            : "Application did not meet minimum requirements";
+                        await _emailService.SendMentorRejectionNotificationAsync(mentorProfile.User.Email, fullName, rejectReason);
+                        _logger.LogInformation("Sent rejection email after re-evaluation for user {UserId}", userId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send email after re-evaluation for user {UserId}", userId);
+                }
+            }
+
+            // Return updated application detail
+            var detailResult = await GetMentorApplicationDetailAsync(userId);
+            if (detailResult.Success)
+                return ServiceResult<MentorApplicationDto>.SuccessResult(detailResult.Data!, resultMessage);
+
+            return ServiceResult<MentorApplicationDto>.SuccessResult(null!, resultMessage);
         }
 
         #endregion

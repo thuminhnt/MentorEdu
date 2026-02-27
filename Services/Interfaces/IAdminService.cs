@@ -101,6 +101,7 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<MentorApplicationDto>> GetMentorApplicationDetailAsync(long userId);
         Task<ServiceResult> ApproveMentorApplicationAsync(long userId, long adminId);
         Task<ServiceResult> RejectMentorApplicationAsync(long userId, long adminId, string reason);
+        Task<ServiceResult<MentorApplicationDto>> ReEvaluateMentorApplicationAsync(long userId, long adminId);
         #endregion
 
         #region Mentor Application History

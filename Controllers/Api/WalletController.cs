@@ -4,6 +4,7 @@ using MentorEdu.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace MentorEdu.Controllers.Api
 {
@@ -13,10 +14,12 @@ namespace MentorEdu.Controllers.Api
     public class WalletController : ControllerBase
     {
         private readonly IWalletService _walletService;
+        private readonly ILogger<WalletController> _logger;
 
-        public WalletController(IWalletService walletService)
+        public WalletController(IWalletService walletService, ILogger<WalletController> logger)
         {
             _walletService = walletService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -75,7 +78,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Top up wallet
+        /// Top up wallet - creates MoMo payment and returns payment URL
         /// </summary>
         [HttpPost("topup")]
         public async Task<ActionResult<ApiResponse<TopupResponseDto>>> Topup([FromBody] TopupRequestDto request)
@@ -93,13 +96,178 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Process topup callback from payment gateway
+        /// Process topup callback from payment gateway (generic)
         /// </summary>
         [HttpPost("topup/callback")]
         [AllowAnonymous]
         public async Task<ActionResult<ApiResponse>> TopupCallback([FromBody] PaymentCallbackDto callback)
         {
             var result = await _walletService.ProcessTopupCallbackAsync(callback);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// MoMo IPN (Instant Payment Notification) callback
+        /// MoMo will POST to this endpoint after payment is completed
+        /// </summary>
+        [HttpPost("momo/ipn")]
+        [AllowAnonymous]
+        public async Task<IActionResult> MoMoIpn()
+        {
+            try
+            {
+                using var reader = new StreamReader(Request.Body);
+                var body = await reader.ReadToEndAsync();
+
+                _logger.LogInformation("MoMo IPN received: {Body}", body);
+
+                var ipnData = JsonSerializer.Deserialize<Dictionary<string, object>>(body);
+                if (ipnData == null)
+                {
+                    return BadRequest(new { resultCode = -1, message = "Invalid request body" });
+                }
+
+                var result = await _walletService.ProcessMoMoIpnAsync(ipnData);
+
+                // MoMo expects HTTP 204 No Content for successful IPN processing
+                if (result.Success)
+                {
+                    return NoContent();
+                }
+
+                return BadRequest(new { resultCode = -1, message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "MoMo IPN processing error");
+                return StatusCode(500, new { resultCode = -1, message = "Internal server error" });
+            }
+        }
+
+        /// <summary>
+        /// VNPay IPN (Instant Payment Notification) callback
+        /// VNPay will GET to this endpoint after payment is completed
+        /// </summary>
+        [HttpGet("vnpay/ipn")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VNPayIpn()
+        {
+            try
+            {
+                _logger.LogInformation("VNPay IPN received: {Query}", Request.QueryString);
+
+                var result = await _walletService.ProcessVNPayCallbackAsync(Request.Query);
+
+                if (result.Success)
+                {
+                    // VNPay expects this exact JSON response format
+                    return Ok(new { RspCode = "00", Message = "Confirm Success" });
+                }
+
+                return Ok(new { RspCode = "99", Message = result.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VNPay IPN processing error");
+                return Ok(new { RspCode = "99", Message = "Internal server error" });
+            }
+        }
+
+        /// <summary>
+        /// VNPay Return URL - Verify VNPay payment from frontend
+        /// Frontend calls this after VNPay redirects back with query params
+        /// </summary>
+        [HttpGet("vnpay/return")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VNPayReturn()
+        {
+            try
+            {
+                _logger.LogInformation("VNPay Return/Verify received: {Query}", Request.QueryString);
+
+                var result = await _walletService.ProcessVNPayCallbackAsync(Request.Query);
+
+                var txnRef = Request.Query["vnp_TxnRef"].ToString();
+                var responseCode = Request.Query["vnp_ResponseCode"].ToString();
+                var amount = Request.Query["vnp_Amount"].ToString();
+                var transNo = Request.Query["vnp_TransactionNo"].ToString();
+
+                return Ok(new
+                {
+                    success = result.Success && responseCode == "00",
+                    responseCode,
+                    transactionRef = txnRef,
+                    amount,
+                    transactionNo = transNo,
+                    message = result.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "VNPay Return/Verify processing error");
+                return Ok(new { success = false, message = "Processing error" });
+            }
+        }
+
+        /// <summary>
+        /// Check transaction status by reference
+        /// </summary>
+        [HttpGet("topup/check/{transactionRef}")]
+        public async Task<ActionResult<ApiResponse<TransactionDto>>> CheckTransactionStatus(string transactionRef)
+        {
+            var result = await _walletService.CheckTransactionStatusAsync(transactionRef);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<TransactionDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<TransactionDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Admin: Confirm bank transfer deposit
+        /// </summary>
+        [HttpPost("bank-transfer/confirm/{transactionRef}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<ApiResponse>> ConfirmBankTransfer(string transactionRef)
+        {
+            var adminUserId = GetCurrentUserId();
+            var result = await _walletService.ConfirmBankTransferAsync(adminUserId, transactionRef);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
+        /// <summary>
+        /// Admin: Get pending bank transfer deposits
+        /// </summary>
+        [HttpGet("bank-transfer/pending")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<ApiResponse<PagedResponse<TransactionDto>>>> GetPendingBankTransfers(
+            [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await _walletService.GetPendingBankTransfersAsync(pageNumber, pageSize);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<PagedResponse<TransactionDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<PagedResponse<TransactionDto>>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Admin: Reject bank transfer deposit
+        /// </summary>
+        [HttpPost("bank-transfer/reject/{transactionRef}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult<ApiResponse>> RejectBankTransfer(string transactionRef)
+        {
+            var adminUserId = GetCurrentUserId();
+            var result = await _walletService.RejectBankTransferAsync(adminUserId, transactionRef);
 
             if (!result.Success)
                 return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));

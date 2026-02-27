@@ -187,6 +187,21 @@ builder.Services.AddScoped<IAIChatRepository, AIChatRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // =======================
+// MOMO SETTINGS
+// =======================
+builder.Services.Configure<MentorEdu.Models.MoMoSettings>(builder.Configuration.GetSection("MoMo"));
+
+// =======================
+// VNPAY SETTINGS
+// =======================
+builder.Services.Configure<MentorEdu.Models.VNPaySettings>(builder.Configuration.GetSection("VNPay"));
+
+// =======================
+// VIETQR SETTINGS
+// =======================
+builder.Services.Configure<MentorEdu.Models.VietQRSettings>(builder.Configuration.GetSection("VietQR"));
+
+// =======================
 // EMAIL SETTINGS
 // =======================
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -210,6 +225,10 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IAIChatService, AIChatService>();
+builder.Services.AddScoped<IMoMoPaymentService, MoMoPaymentService>();
+builder.Services.AddScoped<IVNPayPaymentService, VNPayPaymentService>();
+builder.Services.AddScoped<IVietQRService, VietQRService>();
+builder.Services.AddHttpContextAccessor();
 
 // =======================
 // APP
