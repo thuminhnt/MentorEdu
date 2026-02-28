@@ -12,6 +12,7 @@ namespace MentorEdu.DTOs.Chat
         public long? RequestId { get; set; }
         public string? RequestTitle { get; set; }
         public long? OrderId { get; set; }
+        public string? OrderStatus { get; set; }
         public DateTime? CreatedAt { get; set; }
 
         // Other participant

@@ -427,6 +427,7 @@ namespace MentorEdu.Services.Implementations
             var summary = new WorkSessionSummaryDto
             {
                 OrderId = orderId,
+                OrderStatus = order?.Status.ToString(),
                 TotalSessions = sessions.Count(s => s.Status == WorkSessionStatus.Finished),
                 TotalMinutes = totalMinutes,
                 EstimatedCost = order?.BillingType == BillingType.Hourly 
