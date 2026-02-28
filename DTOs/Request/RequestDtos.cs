@@ -19,6 +19,7 @@ namespace MentorEdu.DTOs.Request
         public string StatusDisplay => Status.ToString();
         public DateTime? CreatedAt { get; set; }
         public int ProposalCount { get; set; }
+        public string? RejectReason { get; set; }
 
         // Student info
         public long StudentId { get; set; }

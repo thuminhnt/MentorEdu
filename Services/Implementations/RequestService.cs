@@ -503,7 +503,8 @@ namespace MentorEdu.Services.Implementations
                 ProposalCount = request.Proposals?.Count ?? 0,
                 StudentId = request.StudentId,
                 StudentName = request.Student?.UserProfile?.FullName,
-                StudentAvatar = request.Student?.UserProfile?.AvatarUrl
+                StudentAvatar = request.Student?.UserProfile?.AvatarUrl,
+                RejectReason = request.RejectReason
             };
         }
 
