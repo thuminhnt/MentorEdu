@@ -23,7 +23,7 @@ dotnet restore
 
 Các API key **không lưu trong `appsettings.json`** mà dùng `dotnet user-secrets` để bảo mật.
 
-Chạy lần lượt các lệnh trong file key-secrets vào trong folder `MentorEdu/`.
+**# Chạy lần lượt các lệnh trong file key-secrets vào trong folder `MentorEdu/`.**
 
 > Kiểm tra lại: `dotnet user-secrets list`
 
@@ -84,7 +84,21 @@ Backend API: **https://localhost:7082**
 
 Swagger: **https://localhost:7082/swagger**
 
-## 5. Thanh toán Test
+## 5. Tài khoản Demo (Seed Data)
+
+Database tự động seed dữ liệu mẫu khi chạy lần đầu, bao gồm 3 tài khoản chính:
+
+| Vai trò | Email | Mật khẩu |
+|---------|-------|----------|
+| **Admin** | `admin@mentor-edu.local` | `Admin123!` |
+| **Student** | `student@mentor-edu.local` | `Student123!` |
+| **Mentor** | `mentor@mentor-edu.local` | `Mentor123!` |
+
+Ngoài ra còn 10 tài khoản mentor mẫu (`mentor01@mentor-edu.local` → `mentor10@mentor-edu.local`) với mật khẩu chung `Password123!`.
+
+> ⚠️ Seed chỉ chạy **một lần** khi DB chưa có tài khoản admin. Nếu muốn seed lại, xóa database rồi chạy `dotnet run`.
+
+## 6. Thanh toán Test
 
 ### MoMo Sandbox
 Login → Wallet → Deposit → chọn MoMo → nhập số tiền → xác nhận → redirect sang trang MoMo test.
@@ -102,7 +116,7 @@ Thẻ test:
 ### Bank Transfer (VietQR)
 Login → Wallet → Deposit → chọn Bank Transfer → nhập số tiền → quét QR → chuyển khoản → Admin xác nhận.
 
-## 6. Database
+## 7. Database
 
 ```bash
 # Tạo migration mới
