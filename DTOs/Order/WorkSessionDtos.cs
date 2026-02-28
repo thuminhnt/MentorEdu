@@ -37,7 +37,7 @@ namespace MentorEdu.DTOs.Order
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
-        // Session Trackings (các l?n Start/Stop)
+        // Session Trackings (cï¿½c l?n Start/Stop)
         public List<SessionTrackingDto>? Trackings { get; set; }
     }
 
@@ -64,7 +64,7 @@ namespace MentorEdu.DTOs.Order
     }
 
     /// <summary>
-    /// Request k?t thúc/pause Work Session
+    /// Request k?t thï¿½c/pause Work Session
     /// </summary>
     public class EndWorkSessionDto
     {
@@ -91,6 +91,7 @@ namespace MentorEdu.DTOs.Order
     public class WorkSessionSummaryDto
     {
         public long OrderId { get; set; }
+        public string? OrderStatus { get; set; }
         public int TotalSessions { get; set; }
         public int TotalMinutes { get; set; }
         public decimal TotalHours => Math.Round(TotalMinutes / 60.0m, 2);

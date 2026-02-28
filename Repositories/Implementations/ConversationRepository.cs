@@ -47,6 +47,7 @@ namespace MentorEdu.Repositories.Implementations
                     .ThenInclude(s => s.UserProfile)
                 .Include(c => c.Mentor)
                     .ThenInclude(m => m.UserProfile)
+                .Include(c => c.Order)
                 .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
                 .OrderByDescending(c => c.Messages.Max(m => m.CreatedAt))
                 .ToListAsync();

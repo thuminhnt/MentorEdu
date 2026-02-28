@@ -301,6 +301,7 @@ namespace MentorEdu.Services.Implementations
                 RequestId = conversation.RequestId,
                 RequestTitle = conversation.Request?.Title,
                 OrderId = conversation.OrderId,
+                OrderStatus = conversation.Order?.Status.ToString(),
                 CreatedAt = conversation.CreatedAt,
                 ParticipantId = participant?.Id ?? 0,
                 ParticipantName = participant?.UserProfile?.FullName,
