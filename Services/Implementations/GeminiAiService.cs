@@ -175,7 +175,7 @@ namespace MentorEdu.Services.Implementations
                     "All CV scanning models (multimodal + text-only) exhausted for user {UserId}. Tried: [{Models}]",
                     userId, string.Join(", ", failedModels));
                 return CreateDefaultReviewResult(
-                    "Tất cả các model AI đều đã hết quota. Hồ sơ sẽ được admin duyệt thủ công.");
+                    "All AI models have exhausted their quota. The profile will be reviewed manually by admin.");
             }
             catch (Exception ex)
             {

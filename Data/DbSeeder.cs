@@ -130,12 +130,12 @@ namespace MentorEdu.Data
                 new UserProfile
                 {
                     UserId = student.Id,
-                    FullName = "Nguyễn Văn Sinh Viên",
+                    FullName = "Nguyen Van Student",
                     Phone = "0902000000",
                     Gender = "Male",
-                    School = "Đại học Bách Khoa TP.HCM",
+                    School = "Ho Chi Minh City University of Technology",
                     Major = "Computer Science",
-                    Bio = "Sinh viên năm 3, đam mê lập trình web và mobile. Đang tìm mentor hướng dẫn dự án tốt nghiệp.",
+                    Bio = "Third-year student, passionate about web and mobile programming. Looking for a mentor to guide my graduation project.",
                     City = "Ho Chi Minh",
                     Country = "Vietnam",
                     CreatedAt = now, UpdatedAt = now
@@ -143,12 +143,12 @@ namespace MentorEdu.Data
                 new UserProfile
                 {
                     UserId = mentor.Id,
-                    FullName = "Trần Minh Mentor",
+                    FullName = "Tran Minh Mentor",
                     Phone = "0903000000",
                     Gender = "Male",
-                    School = "Đại học Khoa học Tự nhiên",
+                    School = "University of Science",
                     Major = "Software Engineering",
-                    Bio = "Senior Full-Stack Developer với 8 năm kinh nghiệm. Chuyên React, .NET, và Cloud Architecture.",
+                    Bio = "Senior Full-Stack Developer with 8 years of experience. Specializing in React, .NET, and Cloud Architecture.",
                     City = "Ho Chi Minh",
                     Country = "Vietnam",
                     CreatedAt = now, UpdatedAt = now
@@ -165,10 +165,8 @@ namespace MentorEdu.Data
                 HourlyRate = 200_000,
                 PackagePrice = 1_500_000,
                 ExperienceYears = 8,
-                Introduction = "Xin chào! Mình là full-stack developer với 8 năm kinh nghiệm làm việc tại các công ty tech lớn. Mình chuyên về React, .NET Core, và cloud computing. Mình sẽ giúp bạn từ cơ bản đến nâng cao.",
-                AvailabilityNote = "Có thể mentor vào buổi tối các ngày trong tuần và cả ngày cuối tuần",
-                RatingAvg = 4.8m,
-                RatingCount = 12,
+                Introduction = "Hi! I'm a full-stack developer with 8 years of experience at major tech companies. I specialize in React, .NET Core, and cloud computing. I can help you from basics to advanced topics.",
+                AvailabilityNote = "Available for mentoring on weekday evenings and all day on weekends",
                 ApprovalStatus = MentorApprovalStatus.Approved,
                 Specialization = "Full-Stack Web Development, Cloud Architecture",
                 PortfolioUrl = "https://github.com/trminh-mentor",
@@ -182,20 +180,20 @@ namespace MentorEdu.Data
             // ─────────── 7. TEN ADDITIONAL MENTORS ───────────
             var mentorData = new[]
             {
-                ("mentor01@mentor-edu.local", "Lê Thị Hương", "Female", "React & Frontend Expert", 150_000m, 1_200_000m, 5, 4.9m, 20, "ĐH FPT", "Chuyên gia Frontend với 5 năm kinh nghiệm, đặc biệt về React và TypeScript.", new[]{"react","typescript","nextjs","tailwindcss"}, new[]{"Web Development"}),
-                ("mentor02@mentor-edu.local", "Phạm Quốc Bảo", "Male", "Backend .NET Specialist", 180_000m, 1_400_000m, 6, 4.7m, 15, "ĐH Bách Khoa", "Senior .NET developer, chuyên microservices và system design.", new[]{"dotnet","csharp","sql","restapi","microservices"}, new[]{"Web Development","Database"}),
-                ("mentor03@mentor-edu.local", "Nguyễn Hoài An", "Female", "Mobile Developer", 160_000m, 1_300_000m, 4, 4.6m, 8, "ĐH CNTT", "Mobile dev chuyên Flutter và React Native, đã publish 10+ apps trên store.", new[]{"flutter","reactnative","javascript","kotlin"}, new[]{"Mobile Development"}),
-                ("mentor04@mentor-edu.local", "Trương Đức Huy", "Male", "Data Scientist", 250_000m, 2_000_000m, 7, 4.8m, 18, "ĐH Khoa học Tự nhiên", "Data Scientist tại VNG, chuyên ML/DL và NLP. Kinh nghiệm Kaggle top 1%.", new[]{"python","machinelearning","deeplearning","datascience","sql"}, new[]{"Data Science"}),
-                ("mentor05@mentor-edu.local", "Võ Thanh Tùng", "Male", "DevOps Engineer", 220_000m, 1_800_000m, 6, 4.5m, 10, "ĐH Bách Khoa Đà Nẵng", "DevOps engineer chuyên AWS, Docker, Kubernetes. Giúp bạn xây dựng CI/CD pipeline.", new[]{"docker","kubernetes","aws","cicd","linux","git"}, new[]{"DevOps & Cloud"}),
-                ("mentor06@mentor-edu.local", "Đặng Thị Mai", "Female", "UI/UX Designer", 140_000m, 1_000_000m, 4, 4.9m, 22, "ĐH Mỹ Thuật", "Lead designer tại Tiki, chuyên user research và design system.", new[]{"figma","tailwindcss","bootstrap"}, new[]{"Design & UI/UX"}),
-                ("mentor07@mentor-edu.local", "Bùi Minh Đức", "Male", "Java Backend Developer", 190_000m, 1_500_000m, 7, 4.7m, 14, "ĐH Công nghệ", "Senior Java developer tại Shopee, chuyên Spring Boot và distributed systems.", new[]{"java","sql","postgresql","microservices","docker","restapi"}, new[]{"Programming Languages","Database"}),
-                ("mentor08@mentor-edu.local", "Lý Ngọc Trâm", "Female", "Python Full-Stack", 170_000m, 1_300_000m, 5, 4.6m, 11, "ĐH FPT", "Python developer chuyên Django/FastAPI và data engineering.", new[]{"python","javascript","postgresql","mongodb","restapi","graphql"}, new[]{"Web Development","Data Science"}),
-                ("mentor09@mentor-edu.local", "Hoàng Văn Nam", "Male", "Cybersecurity Expert", 280_000m, 2_200_000m, 9, 4.8m, 7, "ĐH An ninh", "Pentester & security consultant, OSCP certified.", new[]{"cybersecurity","linux","python"}, new[]{"Cybersecurity"}),
-                ("mentor10@mentor-edu.local", "Phan Thị Yến Nhi", "Female", "Cloud Architect", 260_000m, 2_000_000m, 8, 4.7m, 16, "ĐH Bách Khoa", "AWS Solutions Architect chuyên thiết kế hệ thống cloud-native.", new[]{"aws","azure","docker","kubernetes","cicd","microservices"}, new[]{"DevOps & Cloud","Web Development"}),
+                ("mentor01@mentor-edu.local", "Le Thi Huong", "Female", "React & Frontend Expert", 150_000m, 1_200_000m, 5, "FPT University", "Frontend expert with 5 years of experience, especially in React and TypeScript.", new[]{"react","typescript","nextjs","tailwindcss"}, new[]{"Web Development"}),
+                ("mentor02@mentor-edu.local", "Pham Quoc Bao", "Male", "Backend .NET Specialist", 180_000m, 1_400_000m, 6, "Ho Chi Minh City University of Technology", "Senior .NET developer, specializing in microservices and system design.", new[]{"dotnet","csharp","sql","restapi","microservices"}, new[]{"Web Development","Database"}),
+                ("mentor03@mentor-edu.local", "Nguyen Hoai An", "Female", "Mobile Developer", 160_000m, 1_300_000m, 4, "University of Information Technology", "Mobile dev specializing in Flutter and React Native, published 10+ apps on store.", new[]{"flutter","reactnative","javascript","kotlin"}, new[]{"Mobile Development"}),
+                ("mentor04@mentor-edu.local", "Truong Duc Huy", "Male", "Data Scientist", 250_000m, 2_000_000m, 7, "University of Science", "Data Scientist at VNG, specializing in ML/DL and NLP. Kaggle top 1% experience.", new[]{"python","machinelearning","deeplearning","datascience","sql"}, new[]{"Data Science"}),
+                ("mentor05@mentor-edu.local", "Vo Thanh Tung", "Male", "DevOps Engineer", 220_000m, 1_800_000m, 6, "Da Nang University of Technology", "DevOps engineer specializing in AWS, Docker, Kubernetes. Helping you build CI/CD pipelines.", new[]{"docker","kubernetes","aws","cicd","linux","git"}, new[]{"DevOps & Cloud"}),
+                ("mentor06@mentor-edu.local", "Dang Thi Mai", "Female", "UI/UX Designer", 140_000m, 1_000_000m, 4, "University of Fine Arts", "Lead designer at Tiki, specializing in user research and design system.", new[]{"figma","tailwindcss","bootstrap"}, new[]{"Design & UI/UX"}),
+                ("mentor07@mentor-edu.local", "Bui Minh Duc", "Male", "Java Backend Developer", 190_000m, 1_500_000m, 7, "University of Engineering and Technology", "Senior Java developer at Shopee, specializing in Spring Boot and distributed systems.", new[]{"java","sql","postgresql","microservices","docker","restapi"}, new[]{"Programming Languages","Database"}),
+                ("mentor08@mentor-edu.local", "Ly Ngoc Tram", "Female", "Python Full-Stack", 170_000m, 1_300_000m, 5, "FPT University", "Python developer specializing in Django/FastAPI and data engineering.", new[]{"python","javascript","postgresql","mongodb","restapi","graphql"}, new[]{"Web Development","Data Science"}),
+                ("mentor09@mentor-edu.local", "Hoang Van Nam", "Male", "Cybersecurity Expert", 280_000m, 2_200_000m, 9, "University of Security", "Pentester & security consultant, OSCP certified.", new[]{"cybersecurity","linux","python"}, new[]{"Cybersecurity"}),
+                ("mentor10@mentor-edu.local", "Phan Thi Yen Nhi", "Female", "Cloud Architect", 260_000m, 2_000_000m, 8, "Ho Chi Minh City University of Technology", "AWS Solutions Architect specializing in cloud-native system design.", new[]{"aws","azure","docker","kubernetes","cicd","microservices"}, new[]{"DevOps & Cloud","Web Development"}),
             };
 
             var mentorUsers = new List<User>();
-            foreach (var (email, fullName, gender, title, hourly, package, exp, rating, ratingCount, school, intro, tags, cats) in mentorData)
+            foreach (var (email, fullName, gender, title, hourly, package, exp, school, intro, tags, cats) in mentorData)
             {
                 var u = new User
                 {
@@ -232,9 +230,7 @@ namespace MentorEdu.Data
                     PackagePrice = package,
                     ExperienceYears = exp,
                     Introduction = intro,
-                    AvailabilityNote = "Có thể dạy buổi tối và cuối tuần",
-                    RatingAvg = rating,
-                    RatingCount = ratingCount,
+                    AvailabilityNote = "Available evenings and weekends",
                     ApprovalStatus = MentorApprovalStatus.Approved,
                     Specialization = title,
                     ReviewedAt = now.AddDays(-20),
@@ -294,26 +290,26 @@ namespace MentorEdu.Data
 
             var postTemplates = new[]
             {
-                (catName: "Web Development", title: "Hướng dẫn React từ cơ bản đến nâng cao", content: "React là thư viện JavaScript phổ biến nhất hiện nay. Trong bài viết này mình sẽ chia sẻ lộ trình học React từ cơ bản (JSX, Components, Props, State) đến nâng cao (Hooks, Context, Redux, React Query). Ai đang học React thì cùng thảo luận nhé!", tags: new[]{"react","javascript","typescript"}),
-                (catName: "Web Development", title: "So sánh Next.js vs Vite + React", content: "Mình đã thử cả 2 stack cho dự án mới. Next.js mạnh về SSR, SEO, routing tích hợp. Vite + React thì nhanh, nhẹ, linh hoạt hơn. Tùy project mà chọn. Các bạn dùng stack nào cho dự án của mình?", tags: new[]{"nextjs","react","javascript"}),
-                (catName: "Programming Languages", title: "Tại sao nên học C# và .NET trong 2026?", content: ".NET 9 đã ra mắt với nhiều cải tiến performance đáng kinh ngạc. C# ngày càng modern với pattern matching, record types, và AOT compilation. Ecosystem .NET rất mạnh cho enterprise, game (Unity), và cloud. Bạn nào đang cân nhắc học thì đây là thời điểm tốt!", tags: new[]{"csharp","dotnet","restapi"}),
-                (catName: "Mobile Development", title: "Flutter vs React Native 2026 - Nên chọn cái nào?", content: "Mình đã dùng cả 2 framework cho các dự án thực tế. Flutter mạnh về UI consistency và performance. React Native mạnh về ecosystem và code sharing với web. Chia sẻ kinh nghiệm thực chiến của mình.", tags: new[]{"flutter","reactnative","javascript"}),
-                (catName: "Data Science", title: "Lộ trình học Machine Learning cho người mới", content: "Bước 1: Học Python cơ bản → Bước 2: Numpy, Pandas → Bước 3: Scikit-learn → Bước 4: Deep Learning (TensorFlow/PyTorch) → Bước 5: Làm project thực tế. Mỗi bước mình sẽ recommend tài liệu cụ thể.", tags: new[]{"python","machinelearning","datascience"}),
-                (catName: "DevOps & Cloud", title: "Docker cho người mới bắt đầu", content: "Docker giúp đóng gói ứng dụng vào container, chạy được ở mọi nơi. Bài viết này mình hướng dẫn: Dockerfile, docker-compose, networking, volumes. Cuối bài có demo containerize một ứng dụng .NET + PostgreSQL.", tags: new[]{"docker","kubernetes","linux"}),
-                (catName: "Design & UI/UX", title: "Thiết kế UI/UX hiệu quả với Figma", content: "Figma là công cụ design được yêu thích nhất hiện nay. Tips của mình: 1) Sử dụng Auto Layout, 2) Tạo Design System, 3) Component variants, 4) Prototyping. Ai cần template Figma mình share nhé!", tags: new[]{"figma","tailwindcss"}),
-                (catName: "Database", title: "PostgreSQL vs MongoDB - Khi nào dùng cái nào?", content: "PostgreSQL cho dữ liệu có cấu trúc, cần ACID transactions, complex queries. MongoDB cho dữ liệu linh hoạt, horizontal scaling, real-time analytics. Mình sẽ phân tích từng use case cụ thể.", tags: new[]{"postgresql","mongodb","sql"}),
-                (catName: "Web Development", title: "Xây dựng REST API chuẩn với .NET Core", content: "Chia sẻ best practices: 1) Repository + Unit of Work pattern, 2) DTOs và AutoMapper, 3) Validation với FluentValidation, 4) Error handling middleware, 5) Swagger documentation. Code example đầy đủ!", tags: new[]{"dotnet","csharp","restapi"}),
-                (catName: "Cybersecurity", title: "Bảo mật ứng dụng web - Top 10 lỗ hổng OWASP", content: "OWASP Top 10 năm 2026: Injection, Broken Authentication, XSS, CSRF, Security Misconfiguration... Mình sẽ demo từng loại tấn công và cách phòng chống. Rất quan trọng cho mọi developer!", tags: new[]{"cybersecurity","linux"}),
-                (catName: "Web Development", title: "Tailwind CSS - Tại sao mình bỏ Bootstrap để chuyển sang?", content: "Tailwind CSS cho phép custom UI nhanh gấp 3 lần so với viết CSS truyền thống. Utility-first approach, responsive design, dark mode dễ dàng. Mình sẽ share cách setup và best practices.", tags: new[]{"tailwindcss","bootstrap","react"}),
-                (catName: "DevOps & Cloud", title: "CI/CD Pipeline với GitHub Actions", content: "Tự động hóa build, test, deploy với GitHub Actions. Mình chia sẻ workflow thực tế: lint → test → build Docker image → push to registry → deploy to AWS ECS. Tiết kiệm rất nhiều thời gian!", tags: new[]{"cicd","git","docker","aws"}),
-                (catName: "Programming Languages", title: "Học TypeScript - Từ JavaScript lên level", content: "TypeScript giúp code JavaScript an toàn hơn, dễ maintain hơn. Chia sẻ: Type system, Generics, Utility types, Declaration files. Sau khi dùng TS, mình không muốn quay lại JS nữa!", tags: new[]{"typescript","javascript","nodejs"}),
-                (catName: "Data Science", title: "Deep Learning với PyTorch - Hướng dẫn thực hành", content: "PyTorch dễ debug hơn TensorFlow nhờ dynamic computation graph. Bài viết hướng dẫn: Tensors, Autograd, Neural Networks, Training loop, Transfer Learning. Kèm notebook Colab miễn phí!", tags: new[]{"deeplearning","python","machinelearning"}),
-                (catName: "Database", title: "Redis - Cache hiệu suất cao cho ứng dụng", content: "Redis không chỉ là cache, còn là message broker, session store, leaderboard. Mình chia sẻ cách tích hợp Redis vào .NET: caching patterns, pub/sub, distributed locking. Performance tăng 10x!", tags: new[]{"redis","sql","dotnet"}),
-                (catName: "Web Development", title: "GraphQL vs REST API - Nên chọn gì?", content: "GraphQL cho phép client query chính xác data cần, giảm over-fetching. REST đơn giản, dễ cache, phổ biến. Mình đã dùng cả 2 trong production, chia sẻ ưu nhược điểm từng cái.", tags: new[]{"graphql","restapi","nodejs"}),
-                (catName: "Mobile Development", title: "Publish app lên App Store và Google Play", content: "Kinh nghiệm submit app: 1) Chuẩn bị screenshots, description, 2) Review guidelines, 3) Code signing, 4) TestFlight/Internal testing, 5) Xử lý rejection. Nhiều bạn mới hay bị reject vì lỗi nhỏ!", tags: new[]{"swift","kotlin","flutter"}),
-                (catName: "Web Development", title: "Microservices vs Monolith - Khi nào nên tách?", content: "Đừng microservices vì trend! Monolith phù hợp cho team nhỏ, dự án mới. Microservices cho hệ thống lớn, cần scale independent. Mình sẽ chia sẻ kinh nghiệm migrate monolith → microservices.", tags: new[]{"microservices","docker","restapi"}),
-                (catName: "DevOps & Cloud", title: "AWS cho người mới - Bắt đầu từ đâu?", content: "AWS có 200+ services, rất dễ bị overwhelmed. Lộ trình mình recommend: EC2 → S3 → RDS → Lambda → API Gateway → CloudFront. Free tier đủ để học trong 12 tháng!", tags: new[]{"aws","linux","cicd"}),
-                (catName: "Programming Languages", title: "Golang - Ngôn ngữ cho hệ thống hiệu suất cao", content: "Go đơn giản, compile nhanh, concurrency mạnh mẽ với goroutines. Phù hợp cho microservices, CLI tools, cloud infrastructure. Nhiều big tech đang chuyển sang Go. Ai muốn học cùng không?", tags: new[]{"golang","microservices","docker"}),
+                (catName: "Web Development", title: "React Guide from Basics to Advanced", content: "React is the most popular JavaScript library today. In this post I'll share a React learning roadmap from basics (JSX, Components, Props, State) to advanced (Hooks, Context, Redux, React Query). If you're learning React, let's discuss!", tags: new[]{"react","javascript","typescript"}),
+                (catName: "Web Development", title: "Comparing Next.js vs Vite + React", content: "I've tried both stacks for a new project. Next.js is strong in SSR, SEO, built-in routing. Vite + React is faster, lighter, more flexible. Choose based on your project. What stack do you use?", tags: new[]{"nextjs","react","javascript"}),
+                (catName: "Programming Languages", title: "Why You Should Learn C# and .NET in 2026", content: ".NET 9 has launched with amazing performance improvements. C# is increasingly modern with pattern matching, record types, and AOT compilation. The .NET ecosystem is strong for enterprise, gaming (Unity), and cloud. If you're considering learning it, now is a great time!", tags: new[]{"csharp","dotnet","restapi"}),
+                (catName: "Mobile Development", title: "Flutter vs React Native 2026 - Which One to Choose?", content: "I've used both frameworks for real projects. Flutter is strong in UI consistency and performance. React Native is strong in ecosystem and code sharing with web. Sharing my hands-on experience.", tags: new[]{"flutter","reactnative","javascript"}),
+                (catName: "Data Science", title: "Machine Learning Roadmap for Beginners", content: "Step 1: Learn basic Python -> Step 2: Numpy, Pandas -> Step 3: Scikit-learn -> Step 4: Deep Learning (TensorFlow/PyTorch) -> Step 5: Build real projects. I'll recommend specific resources for each step.", tags: new[]{"python","machinelearning","datascience"}),
+                (catName: "DevOps & Cloud", title: "Docker for Beginners", content: "Docker helps package applications into containers that can run anywhere. This post covers: Dockerfile, docker-compose, networking, volumes. At the end there's a demo containerizing a .NET + PostgreSQL application.", tags: new[]{"docker","kubernetes","linux"}),
+                (catName: "Design & UI/UX", title: "Effective UI/UX Design with Figma", content: "Figma is the most loved design tool today. My tips: 1) Use Auto Layout, 2) Create a Design System, 3) Component variants, 4) Prototyping. Need a Figma template? I'll share!", tags: new[]{"figma","tailwindcss"}),
+                (catName: "Database", title: "PostgreSQL vs MongoDB - When to Use Which?", content: "PostgreSQL for structured data, ACID transactions, complex queries. MongoDB for flexible data, horizontal scaling, real-time analytics. I'll analyze each specific use case.", tags: new[]{"postgresql","mongodb","sql"}),
+                (catName: "Web Development", title: "Building a Proper REST API with .NET Core", content: "Sharing best practices: 1) Repository + Unit of Work pattern, 2) DTOs and AutoMapper, 3) Validation with FluentValidation, 4) Error handling middleware, 5) Swagger documentation. Full code examples!", tags: new[]{"dotnet","csharp","restapi"}),
+                (catName: "Cybersecurity", title: "Web Application Security - OWASP Top 10 Vulnerabilities", content: "OWASP Top 10 in 2026: Injection, Broken Authentication, XSS, CSRF, Security Misconfiguration... I'll demo each type of attack and how to prevent them. Very important for every developer!", tags: new[]{"cybersecurity","linux"}),
+                (catName: "Web Development", title: "Tailwind CSS - Why I Switched from Bootstrap", content: "Tailwind CSS lets you customize UI 3x faster than writing traditional CSS. Utility-first approach, responsive design, easy dark mode. I'll share setup and best practices.", tags: new[]{"tailwindcss","bootstrap","react"}),
+                (catName: "DevOps & Cloud", title: "CI/CD Pipeline with GitHub Actions", content: "Automate build, test, deploy with GitHub Actions. Sharing a real workflow: lint -> test -> build Docker image -> push to registry -> deploy to AWS ECS. Saves so much time!", tags: new[]{"cicd","git","docker","aws"}),
+                (catName: "Programming Languages", title: "Learning TypeScript - Leveling Up from JavaScript", content: "TypeScript makes JavaScript code safer and easier to maintain. Topics: Type system, Generics, Utility types, Declaration files. After using TS, I never want to go back to JS!", tags: new[]{"typescript","javascript","nodejs"}),
+                (catName: "Data Science", title: "Deep Learning with PyTorch - Practical Guide", content: "PyTorch is easier to debug than TensorFlow thanks to dynamic computation graphs. This post covers: Tensors, Autograd, Neural Networks, Training loop, Transfer Learning. Includes free Colab notebook!", tags: new[]{"deeplearning","python","machinelearning"}),
+                (catName: "Database", title: "Redis - High Performance Cache for Applications", content: "Redis is not just a cache, it's also a message broker, session store, leaderboard. I'll share how to integrate Redis with .NET: caching patterns, pub/sub, distributed locking. 10x performance boost!", tags: new[]{"redis","sql","dotnet"}),
+                (catName: "Web Development", title: "GraphQL vs REST API - Which to Choose?", content: "GraphQL allows clients to query exactly the data needed, reducing over-fetching. REST is simpler, easier to cache, more widespread. I've used both in production, sharing pros and cons of each.", tags: new[]{"graphql","restapi","nodejs"}),
+                (catName: "Mobile Development", title: "Publishing Apps on App Store and Google Play", content: "App submission experience: 1) Prepare screenshots, description, 2) Review guidelines, 3) Code signing, 4) TestFlight/Internal testing, 5) Handling rejection. Many newcomers get rejected for small mistakes!", tags: new[]{"swift","kotlin","flutter"}),
+                (catName: "Web Development", title: "Microservices vs Monolith - When to Split?", content: "Don't go microservices just for the trend! Monolith suits small teams and new projects. Microservices for large systems needing independent scaling. I'll share my experience migrating from monolith to microservices.", tags: new[]{"microservices","docker","restapi"}),
+                (catName: "DevOps & Cloud", title: "AWS for Beginners - Where to Start?", content: "AWS has 200+ services, very easy to get overwhelmed. My recommended roadmap: EC2 -> S3 -> RDS -> Lambda -> API Gateway -> CloudFront. Free tier is enough to learn for 12 months!", tags: new[]{"aws","linux","cicd"}),
+                (catName: "Programming Languages", title: "Golang - Language for High-Performance Systems", content: "Go is simple, compiles fast, powerful concurrency with goroutines. Suitable for microservices, CLI tools, cloud infrastructure. Many big tech companies are switching to Go. Want to learn together?", tags: new[]{"golang","microservices","docker"}),
             };
 
             var random = new Random(42); // fixed seed for reproducible data
@@ -369,18 +365,18 @@ namespace MentorEdu.Data
         {
             var comments = new[]
             {
-                "Bài viết rất hữu ích, cảm ơn bạn đã chia sẻ!",
-                "Mình đang cần tìm hiểu về vấn đề này, thanks!",
-                "Có thể chia sẻ thêm tài liệu tham khảo được không?",
-                "Hay quá! Mình sẽ áp dụng vào dự án của mình.",
-                "Cảm ơn mentor, bài viết dễ hiểu lắm ạ.",
-                "Mình có một câu hỏi, mentor có thể giải thích thêm phần này không?",
-                "Đúng kinh nghiệm thực tế, mình cũng gặp vấn đề tương tự.",
-                "🔥 Nội dung chất lượng!",
-                "Follow mentor để đọc thêm bài viết mới nhé!",
-                "Mình đã bookmark bài này rồi, rất bổ ích.",
-                "Chia sẻ thêm về phần performance optimization được không ạ?",
-                "Mình mới bắt đầu học, bài viết này giúp mình rất nhiều!",
+                "Very helpful post, thanks for sharing!",
+                "I was looking into this topic, thanks!",
+                "Could you share more reference materials?",
+                "Great! I'll apply this to my project.",
+                "Thank you mentor, the post is very easy to understand.",
+                "I have a question, could you explain this part more?",
+                "Real-world experience, I've encountered the same issue.",
+                "🔥 Quality content!",
+                "Follow the mentor for more new posts!",
+                "I've bookmarked this post, very informative.",
+                "Could you share more about performance optimization?",
+                "I just started learning, this post helped me a lot!",
             };
             return comments[rng.Next(comments.Length)];
         }
