@@ -1180,6 +1180,9 @@ namespace MentorEdu.Services.Implementations
             if (request.ToDate.HasValue)
                 query = query.Where(p => p.CreatedAt <= request.ToDate);
 
+            if (request.IsHidden.HasValue)
+                query = query.Where(p => p.IsHidden == request.IsHidden.Value);
+
             var totalCount = await query.CountAsync();
 
             var posts = await query
@@ -1203,7 +1206,7 @@ namespace MentorEdu.Services.Implementations
                 AuthorAvatar = p.Author?.UserProfile?.AvatarUrl,
                 CommentCount = p.Comments?.Count ?? 0,
                 ReportCount = 0,
-                IsHidden = false
+                IsHidden = p.IsHidden
             });
 
             var response = PagedResponse<AdminPostListDto>.Create(dtos, request.PageNumber, request.PageSize, totalCount);
@@ -1236,17 +1239,36 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult> AdminHidePostAsync(long postId, string reason)
         {
-            // Since we don't have IsHidden field, we'll just return success
-            // In production, add IsHidden field to CommunityPost model
             var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postId);
 
             if (post == null)
                 return ServiceResult.NotFoundResult("Post not found");
 
-            // TODO: Add IsHidden field to CommunityPost model
+            post.IsHidden = true;
+            post.HiddenReason = reason;
+            post.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.CommunityPosts.Update(post);
             await _unitOfWork.SaveChangesAsync();
 
             return ServiceResult.SuccessResult("Post hidden successfully");
+        }
+
+        public async Task<ServiceResult> AdminUnhidePostAsync(long postId)
+        {
+            var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postId);
+
+            if (post == null)
+                return ServiceResult.NotFoundResult("Post not found");
+
+            post.IsHidden = false;
+            post.HiddenReason = null;
+            post.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.CommunityPosts.Update(post);
+            await _unitOfWork.SaveChangesAsync();
+
+            return ServiceResult.SuccessResult("Post unhidden successfully");
         }
 
         #endregion

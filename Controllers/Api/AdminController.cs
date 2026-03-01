@@ -565,6 +565,20 @@ namespace MentorEdu.Controllers.Api
             return Ok(ApiResponse.SuccessResponse(result.Message));
         }
 
+        /// <summary>
+        /// Unhide a post (admin only - revert mistaken hide)
+        /// </summary>
+        [HttpPost("posts/{postId}/unhide")]
+        public async Task<ActionResult<ApiResponse>> UnhidePost(long postId)
+        {
+            var result = await _adminService.AdminUnhidePostAsync(postId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse.SuccessResponse(result.Message));
+        }
+
         #endregion
 
         #region Community Comments Management

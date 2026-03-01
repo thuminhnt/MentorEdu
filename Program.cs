@@ -20,12 +20,12 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString, sqlServerOptionsAction: sqlOptions =>
+    options.UseNpgsql(connectionString, npgsqlOptions =>
     {
-        sqlOptions.EnableRetryOnFailure(
+        npgsqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(30),
-            errorNumbersToAdd: null);
+            errorCodesToAdd: null);
     }));
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -39,7 +39,10 @@ builder.Services
         options.SignIn.RequireConfirmedAccount = true;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>();
-
+builder.Services.AddSwaggerGen(options =>
+{
+    options.CustomSchemaIds(type => type.FullName);
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
