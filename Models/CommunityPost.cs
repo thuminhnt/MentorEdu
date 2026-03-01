@@ -29,6 +29,13 @@ namespace MentorEdu.Models
         [Column("updated_at")]
         public DateTime? UpdatedAt { get; set; }
 
+        [Column("is_hidden")]
+        public bool IsHidden { get; set; } = false;
+
+        [MaxLength(500)]
+        [Column("hidden_reason")]
+        public string? HiddenReason { get; set; }
+
         // Navigation Properties
         [ForeignKey("AuthorId")]
         public virtual User Author { get; set; } = null!;

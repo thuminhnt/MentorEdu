@@ -170,15 +170,15 @@ namespace MentorEdu.Data
                 .Property(e => e.Amount)
                 .HasColumnType("decimal(18,2)");
 
-            // Notification.Data store as nvarchar(max) (SQL Server does not have native json type)
+            // Notification.Data store as text (PostgreSQL)
             modelBuilder.Entity<Notification>()
                 .Property(n => n.Data)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             // MentorApplicationHistory configuration
             modelBuilder.Entity<MentorApplicationHistory>()
                 .Property(h => h.ApplicationSnapshot)
-                .HasColumnType("nvarchar(max)");
+                .HasColumnType("text");
 
             modelBuilder.Entity<MentorApplicationHistory>()
                 .Property(h => h.AiConfidenceScore)

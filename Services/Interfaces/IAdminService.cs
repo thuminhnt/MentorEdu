@@ -67,6 +67,7 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<PagedResponse<AdminPostListDto>>> GetAllPostsAsync(AdminSearchPostDto request);
         Task<ServiceResult> AdminDeletePostAsync(long postId, string reason);
         Task<ServiceResult> AdminHidePostAsync(long postId, string reason);
+        Task<ServiceResult> AdminUnhidePostAsync(long postId);
         #endregion
 
         #region Community Comments Management

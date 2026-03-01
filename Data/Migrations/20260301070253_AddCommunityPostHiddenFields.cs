@@ -5,7 +5,7 @@
 namespace MentorEdu.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class AddIsHiddenToCommunityPost : Migration
+    public partial class AddCommunityPostHiddenFields : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -13,14 +13,14 @@ namespace MentorEdu.Data.Migrations
             migrationBuilder.AddColumn<string>(
                 name: "hidden_reason",
                 table: "community_posts",
-                type: "nvarchar(500)",
+                type: "character varying(500)",
                 maxLength: 500,
                 nullable: true);
 
             migrationBuilder.AddColumn<bool>(
                 name: "is_hidden",
                 table: "community_posts",
-                type: "bit",
+                type: "boolean",
                 nullable: false,
                 defaultValue: false);
         }
