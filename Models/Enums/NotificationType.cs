@@ -17,6 +17,7 @@ namespace MentorEdu.Models.Enums
         WalletTransaction,
         RelevantPost,
         NewComment,
-        NewFollower
+        NewFollower,
+        PostHidden
     }
 }

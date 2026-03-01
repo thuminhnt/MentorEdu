@@ -18,12 +18,14 @@ namespace MentorEdu.Services.Implementations
         private readonly IEmailService _emailService;
         private readonly IGeminiAiService _geminiAiService;
         private readonly ILogger<AdminService> _logger;
+        private readonly INotificationService _notificationService;
 
-        public AdminService(IUnitOfWork unitOfWork, IEmailService emailService, IGeminiAiService geminiAiService, ILogger<AdminService> logger) : base(unitOfWork)
+        public AdminService(IUnitOfWork unitOfWork, IEmailService emailService, IGeminiAiService geminiAiService, ILogger<AdminService> logger, INotificationService notificationService) : base(unitOfWork)
         {
             _emailService = emailService;
             _geminiAiService = geminiAiService;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
         #region Dashboard
@@ -626,32 +628,87 @@ namespace MentorEdu.Services.Implementations
                 .Include(r => r.Reporter).ThenInclude(u => u.UserProfile)
                 .Include(r => r.ReportedUser).ThenInclude(u => u.UserProfile)
                 .Include(r => r.Order)
+                .Include(r => r.Review)
                 .Include(r => r.Handler)
                 .OrderByDescending(r => r.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            var dtos = reports.Select(r => new ReportDto
+            var dtos = new List<ReportDto>();
+            foreach (var r in reports)
             {
-                Id = r.Id,
-                Reason = r.Reason,
-                Details = r.Details,
-                Status = r.Status,
-                CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt,
-                ReporterId = r.ReporterId,
-                ReporterName = r.Reporter?.UserProfile?.FullName,
-                ReportedUserId = r.ReportedUserId,
-                ReportedUserName = r.ReportedUser?.UserProfile?.FullName,
-                OrderId = r.OrderId,
-                OrderTitle = r.Order?.Request?.Title,
-                HandledBy = r.HandledBy,
-                HandlerName = r.Handler?.UserProfile?.FullName
-            });
+                var dto = new ReportDto
+                {
+                    Id = r.Id,
+                    Reason = r.Reason,
+                    Details = r.Details,
+                    Status = r.Status,
+                    CreatedAt = r.CreatedAt,
+                    UpdatedAt = r.UpdatedAt,
+                    ReporterId = r.ReporterId,
+                    ReporterName = r.Reporter?.UserProfile?.FullName,
+                    ReportedUserId = r.ReportedUserId,
+                    ReportedUserName = r.ReportedUser?.UserProfile?.FullName,
+                    OrderId = r.OrderId,
+                    OrderTitle = r.Order?.Request?.Title,
+                    ReviewId = r.ReviewId,
+                    ReviewRating = r.Review?.Rating,
+                    ReviewComment = r.Review?.Comment,
+                    HandledBy = r.HandledBy,
+                    HandlerName = r.Handler?.UserProfile?.FullName
+                };
+
+                // Determine reported content type and preview
+                if (r.ReviewId.HasValue && r.Review != null)
+                {
+                    dto.ReportedContentType = "Review";
+                    dto.ReportedContentPreview = $"Rating: {r.Review.Rating}/5 - {(r.Review.Comment?.Length > 100 ? r.Review.Comment[..100] + "..." : r.Review.Comment)}";
+                }
+                else if (r.Details != null && (r.Details.Contains("[Community Post") || r.Details.Contains("Post id=") || r.Details.Contains("Post id =")))
+                {
+                    dto.ReportedContentType = "Post";
+                    // Try parsing post content from details
+                    var postInfo = ParsePostInfoFromDetails(r.Details);
+                    if (postInfo.HasValue)
+                    {
+                        var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postInfo.Value.PostId);
+                        dto.ReportedContentPreview = post != null 
+                            ? $"Post: \"{post.Title}\" - {(post.Content?.Length > 100 ? post.Content[..100] + "..." : post.Content)}"
+                            : $"Post #{postInfo.Value.PostId}: {postInfo.Value.Title}";
+                    }
+                }
+                else if (r.OrderId.HasValue)
+                {
+                    dto.ReportedContentType = "Order";
+                    dto.ReportedContentPreview = $"Order #{r.OrderId}";
+                }
+                else
+                {
+                    dto.ReportedContentType = "User";
+                    dto.ReportedContentPreview = r.Details;
+                }
+
+                dtos.Add(dto);
+            }
 
             var response = PagedResponse<ReportDto>.Create(dtos, pageNumber, pageSize, totalCount);
             return ServiceResult<PagedResponse<ReportDto>>.SuccessResult(response);
+        }
+
+        private (long PostId, string Title)? ParsePostInfoFromDetails(string details)
+        {
+            // Format mới: [Community Post #8: "title"] ...
+            var match = System.Text.RegularExpressions.Regex.Match(details, @"\[Community Post #(\d+):\s*""([^""]*)""\]");
+            if (match.Success && long.TryParse(match.Groups[1].Value, out var postId1))
+                return (postId1, match.Groups[2].Value);
+
+            // Format cũ: "Post id=8" hoặc "Post id = 8"
+            var match2 = System.Text.RegularExpressions.Regex.Match(details, @"Post id\s*=\s*(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match2.Success && long.TryParse(match2.Groups[1].Value, out var postId2))
+                return (postId2, "");
+
+            return null;
         }
 
         public async Task<ServiceResult<ReportDetailDto>> GetReportDetailAsync(long reportId)
@@ -660,6 +717,7 @@ namespace MentorEdu.Services.Implementations
                 .Include(r => r.Reporter).ThenInclude(u => u.UserProfile)
                 .Include(r => r.ReportedUser).ThenInclude(u => u.UserProfile)
                 .Include(r => r.Order).ThenInclude(o => o!.Request)
+                .Include(r => r.Review).ThenInclude(rv => rv!.FromUser).ThenInclude(u => u.UserProfile)
                 .Include(r => r.Handler)
                 .FirstOrDefaultAsync(r => r.Id == reportId);
 
@@ -700,6 +758,53 @@ namespace MentorEdu.Services.Implementations
                 } : null,
                 HandlerName = report.Handler?.UserProfile?.FullName
             };
+
+            // Add Review info
+            if (report.ReviewId.HasValue && report.Review != null)
+            {
+                dto.ReportedContentType = "Review";
+                dto.Review = new ReportReviewDto
+                {
+                    Id = report.Review.Id,
+                    Rating = report.Review.Rating,
+                    Comment = report.Review.Comment,
+                    FromUserName = report.Review.FromUser?.UserProfile?.FullName,
+                    ToUserName = report.ReportedUser?.UserProfile?.FullName,
+                    CreatedAt = report.Review.CreatedAt
+                };
+            }
+            // Add Post info (parsed from details)
+            else if (report.Details != null && (report.Details.Contains("[Community Post") || report.Details.Contains("Post id=") || report.Details.Contains("Post id =")))
+            {
+                dto.ReportedContentType = "Post";
+                var postInfo = ParsePostInfoFromDetails(report.Details);
+                if (postInfo.HasValue)
+                {
+                    var post = await _unitOfWork.CommunityPosts.Query()
+                        .Include(p => p.Author).ThenInclude(a => a.UserProfile)
+                        .FirstOrDefaultAsync(p => p.Id == postInfo.Value.PostId);
+                    if (post != null)
+                    {
+                        dto.Post = new ReportPostDto
+                        {
+                            Id = post.Id,
+                            Title = post.Title,
+                            ContentPreview = post.Content?.Length > 300 ? post.Content[..300] + "..." : post.Content,
+                            AuthorName = post.Author?.UserProfile?.FullName,
+                            IsHidden = post.IsHidden,
+                            CreatedAt = post.CreatedAt
+                        };
+                    }
+                }
+            }
+            else if (report.OrderId.HasValue)
+            {
+                dto.ReportedContentType = "Order";
+            }
+            else
+            {
+                dto.ReportedContentType = "User";
+            }
 
             return ServiceResult<ReportDetailDto>.SuccessResult(dto);
         }
@@ -771,6 +876,40 @@ namespace MentorEdu.Services.Implementations
             }
 
             await _unitOfWork.SaveChangesAsync();
+
+            // If resolving a report about a post, auto-hide the post and notify author
+            if (request.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase) 
+                && report.Details != null 
+                && (report.Details.Contains("[Community Post") || report.Details.Contains("Post id=") || report.Details.Contains("Post id =")))
+            {
+                var postInfo = ParsePostInfoFromDetails(report.Details);
+                if (postInfo.HasValue)
+                {
+                    var post = await _unitOfWork.CommunityPosts.GetByIdAsync(postInfo.Value.PostId);
+                    if (post != null && !post.IsHidden)
+                    {
+                        post.IsHidden = true;
+                        post.HiddenReason = report.Reason ?? "Violated policies";
+                        post.UpdatedAt = DateTime.UtcNow;
+                        _unitOfWork.CommunityPosts.Update(post);
+                        await _unitOfWork.SaveChangesAsync();
+
+                        // Notify the post author
+                        try
+                        {
+                            await _notificationService.CreateNotificationAsync(
+                                post.AuthorId,
+                                NotificationType.PostHidden,
+                                "Post Hidden",
+                                $"Your post \"{post.Title}\" has been hidden due to a report. Reason: {report.Reason ?? "Violated policies"}",
+                                $"/community"
+                            );
+                        }
+                        catch { /* Don't fail if notification fails */ }
+                    }
+                }
+            }
+
             return ServiceResult.SuccessResult("Report handled successfully");
         }
 
@@ -1250,6 +1389,19 @@ namespace MentorEdu.Services.Implementations
 
             _unitOfWork.CommunityPosts.Update(post);
             await _unitOfWork.SaveChangesAsync();
+
+            // Send notification to post author
+            try
+            {
+                await _notificationService.CreateNotificationAsync(
+                    post.AuthorId,
+                    NotificationType.PostHidden,
+                    "Post Hidden",
+                    $"Your post \"{post.Title}\" has been hidden by admin. Reason: {reason}",
+                    $"/community"
+                );
+            }
+            catch { /* Don't fail hide operation if notification fails */ }
 
             return ServiceResult.SuccessResult("Post hidden successfully");
         }

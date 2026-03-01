@@ -37,7 +37,7 @@ namespace MentorEdu.Repositories.Implementations
         public async Task<IEnumerable<CommunityPost>> GetByAuthorIdAsync(long authorId)
         {
             return await _dbSet
-                .Where(p => p.AuthorId == authorId)
+                .Where(p => p.AuthorId == authorId && !p.IsHidden)
                 .Include(p => p.Author)
                     .ThenInclude(a => a.UserProfile)
                 .Include(p => p.Category)
@@ -55,7 +55,7 @@ namespace MentorEdu.Repositories.Implementations
             int pageSize,
             string? searchTerm = null)
         {
-            var query = _dbSet.AsQueryable();
+            var query = _dbSet.Where(p => !p.IsHidden).AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
                 query = query.Where(p => p.Title!.Contains(searchTerm) || 
@@ -86,7 +86,7 @@ namespace MentorEdu.Repositories.Implementations
             string? searchTerm,
             List<long> authorIds)
         {
-            var query = _dbSet.Where(p => authorIds.Contains(p.AuthorId));
+            var query = _dbSet.Where(p => authorIds.Contains(p.AuthorId) && !p.IsHidden);
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
                 query = query.Where(p => p.Title!.Contains(searchTerm) || 
@@ -114,6 +114,7 @@ namespace MentorEdu.Repositories.Implementations
         public async Task<IEnumerable<CommunityPost>> GetRecentPostsAsync(int count)
         {
             return await _dbSet
+                .Where(p => !p.IsHidden)
                 .Include(p => p.Author)
                     .ThenInclude(a => a.UserProfile)
                 .Include(p => p.Category)
