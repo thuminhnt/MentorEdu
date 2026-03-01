@@ -23,7 +23,7 @@ dotnet restore
 
 Các API key **không lưu trong `appsettings.json`** mà dùng `dotnet user-secrets` để bảo mật.
 
-**# Chạy lần lượt các lệnh trong file key-secrets vào trong folder `MentorEdu/`.**
+**## Chạy lần lượt các lệnh trong file key-secrets vào trong folder `MentorEdu/`.**
 
 > Kiểm tra lại: `dotnet user-secrets list`
 
