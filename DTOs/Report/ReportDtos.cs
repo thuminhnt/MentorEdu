@@ -26,6 +26,15 @@ namespace MentorEdu.DTOs.Report
         public long? OrderId { get; set; }
         public string? OrderTitle { get; set; }
 
+        // Review (nếu có)
+        public long? ReviewId { get; set; }
+        public int? ReviewRating { get; set; }
+        public string? ReviewComment { get; set; }
+
+        // Reported content summary
+        public string? ReportedContentType { get; set; } // "Post", "Review", "Order", "User"
+        public string? ReportedContentPreview { get; set; }
+
         // Handler (admin x? l�)
         public long? HandledBy { get; set; }
         public string? HandlerName { get; set; }
@@ -51,6 +60,15 @@ namespace MentorEdu.DTOs.Report
 
         // Order detail
         public ReportOrderDto? Order { get; set; }
+
+        // Review detail
+        public ReportReviewDto? Review { get; set; }
+
+        // Post detail (parsed from details)
+        public ReportPostDto? Post { get; set; }
+
+        // Reported content type
+        public string? ReportedContentType { get; set; }
 
         // Handler
         public string? HandlerName { get; set; }
@@ -78,6 +96,32 @@ namespace MentorEdu.DTOs.Report
         public string? Title { get; set; }
         public string? Status { get; set; }
         public decimal? TotalPrice { get; set; }
+    }
+
+    /// <summary>
+    /// Review info trong Report
+    /// </summary>
+    public class ReportReviewDto
+    {
+        public long Id { get; set; }
+        public int Rating { get; set; }
+        public string? Comment { get; set; }
+        public string? FromUserName { get; set; }
+        public string? ToUserName { get; set; }
+        public DateTime? CreatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Post info trong Report
+    /// </summary>
+    public class ReportPostDto
+    {
+        public long Id { get; set; }
+        public string? Title { get; set; }
+        public string? ContentPreview { get; set; }
+        public string? AuthorName { get; set; }
+        public bool IsHidden { get; set; }
+        public DateTime? CreatedAt { get; set; }
     }
 
     /// <summary>

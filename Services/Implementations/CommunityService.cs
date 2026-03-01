@@ -37,11 +37,24 @@ namespace MentorEdu.Services.Implementations
                 .Include(p => p.Proposals)
                 .AsQueryable();
 
-            // Keyword filter
+            // Filter out hidden posts for normal users
+            query = query.Where(p => !p.IsHidden);
+
+            // Author filter
+            if (searchDto.AuthorId.HasValue)
+            {
+                query = query.Where(p => p.AuthorId == searchDto.AuthorId.Value);
+            }
+
+            // Keyword filter (search title, content, author name, author email - case-insensitive)
             if (!string.IsNullOrWhiteSpace(searchDto.Keyword))
             {
-                query = query.Where(p => p.Title!.Contains(searchDto.Keyword) || 
-                                          p.Content!.Contains(searchDto.Keyword));
+                var kw = $"%{searchDto.Keyword}%";
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.Title ?? "", kw) ||
+                    EF.Functions.ILike(p.Content ?? "", kw) ||
+                    (p.Author.UserProfile != null && p.Author.UserProfile.FullName != null && EF.Functions.ILike(p.Author.UserProfile.FullName, kw)) ||
+                    (p.Author.Email != null && EF.Functions.ILike(p.Author.Email, kw)));
             }
 
             // Hashtag filter
@@ -75,6 +88,10 @@ namespace MentorEdu.Services.Implementations
             var post = await _unitOfWork.CommunityPosts.GetByIdWithCommentsAsync(postId);
             
             if (post == null)
+                return ServiceResult<CommunityPostDetailDto>.NotFoundResult("Post not found");
+
+            // Don't show hidden posts to non-authors
+            if (post.IsHidden && currentUserId != post.AuthorId)
                 return ServiceResult<CommunityPostDetailDto>.NotFoundResult("Post not found");
 
             var dto = MapToPostDetailDto(post);
