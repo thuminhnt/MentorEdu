@@ -92,7 +92,7 @@ namespace MentorEdu.DTOs.Report
 
         public long? ReviewId { get; set; }
 
-        [Required(ErrorMessage = "Lý do báo cáo là bắt buộc")]
+        [Required(ErrorMessage = "Report reason is required")]
         [MaxLength(2000)]
         public string Reason { get; set; } = string.Empty;
 

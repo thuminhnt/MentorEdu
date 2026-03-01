@@ -396,7 +396,7 @@ namespace MentorEdu.Services.Implementations
                 _unitOfWork.Transactions.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return ServiceResult.SuccessResult("Nạp tiền thành công");
+                return ServiceResult.SuccessResult("Top-up successful");
             }
             else
             {
@@ -404,7 +404,7 @@ namespace MentorEdu.Services.Implementations
                 _unitOfWork.Transactions.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return ServiceResult.FailResult("Thanh toán thất bại");
+                return ServiceResult.FailResult("Payment failed");
             }
         }
 
@@ -456,7 +456,7 @@ namespace MentorEdu.Services.Implementations
                 var momoTransId = ipnData.TryGetValue("transId", out var tid) ? tid?.ToString() : null;
                 if (!string.IsNullOrEmpty(momoTransId))
                 {
-                    transaction.Description = $"Nạp tiền qua MoMo (MoMo TransId: {momoTransId})";
+                    transaction.Description = $"Top-up via MoMo (MoMo TransId: {momoTransId})";
                 }
 
                 wallet.Balance += transaction.Amount;
@@ -466,7 +466,7 @@ namespace MentorEdu.Services.Implementations
                 _unitOfWork.Transactions.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return ServiceResult.SuccessResult("Nạp tiền thành công");
+                return ServiceResult.SuccessResult("Top-up successful");
             }
             else
             {
@@ -518,7 +518,7 @@ namespace MentorEdu.Services.Implementations
                 transaction.Status = TransactionStatus.Success;
                 if (!string.IsNullOrEmpty(transactionNo))
                 {
-                    transaction.Description = $"Nạp tiền qua VNPay (VNPay TransNo: {transactionNo})";
+                    transaction.Description = $"Top-up via VNPay (VNPay TransNo: {transactionNo})";
                 }
 
                 wallet.Balance += transaction.Amount;
@@ -528,7 +528,7 @@ namespace MentorEdu.Services.Implementations
                 _unitOfWork.Transactions.Update(transaction);
                 await _unitOfWork.SaveChangesAsync();
 
-                return ServiceResult.SuccessResult("Nạp tiền thành công");
+                return ServiceResult.SuccessResult("Top-up successful");
             }
             else
             {

@@ -9,7 +9,7 @@ namespace MentorEdu.Repositories.Implementations
     {
         public GroupRepository(ApplicationDbContext context) : base(context)
         {
-        } // ✅ ĐÓNG CONSTRUCTOR Ở ĐÂY
+        }
 
         public override async Task<Group?> GetByIdAsync(long id)
         {

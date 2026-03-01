@@ -32,11 +32,9 @@
                 StatusCode = 201
             };
         }
-        // ✅ THÊM CÁI NÀY
         public static ServiceResult<T> FailResult(string message, int statusCode = 400)
             => new ServiceResult<T> { Success = false, Message = message, StatusCode = statusCode };
 
-        // ✅ THÊM Failure để hết lỗi compile
         public static ServiceResult<T> Failure(string message, int statusCode = 400)
             => new ServiceResult<T> { Success = false, Message = message, StatusCode = statusCode };
 
