@@ -27,7 +27,7 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult<PagedResponse<CommunityPostListDto>>> GetPostsAsync(SearchPostDto searchDto, long? currentUserId = null)
         {
-            // Build query with filters
+            // Xây dựng query với các bộ lọc
             var query = _unitOfWork.CommunityPosts.Query()
                 .Include(p => p.Author).ThenInclude(a => a.UserProfile)
                 .Include(p => p.Category)
@@ -37,16 +37,16 @@ namespace MentorEdu.Services.Implementations
                 .Include(p => p.Proposals)
                 .AsQueryable();
 
-            // Filter out hidden posts for normal users
+            // Loại bỏ những bài viết đã bị ẩn với người dùng thường
             query = query.Where(p => !p.IsHidden);
 
-            // Author filter
+            // Lọc theo tác giả
             if (searchDto.AuthorId.HasValue)
             {
                 query = query.Where(p => p.AuthorId == searchDto.AuthorId.Value);
             }
 
-            // Keyword filter (search title, content, author name, author email - case-insensitive)
+            // Lọc theo từ khóa (tìm trong tiêu đề, nội dung, tên tác giả, email - không phân biệt hoa thường)
             if (!string.IsNullOrWhiteSpace(searchDto.Keyword))
             {
                 var kw = $"%{searchDto.Keyword}%";
@@ -57,13 +57,13 @@ namespace MentorEdu.Services.Implementations
                     (p.Author.Email != null && EF.Functions.ILike(p.Author.Email, kw)));
             }
 
-            // Hashtag filter
+            // Lọc theo hashtag
             if (!string.IsNullOrWhiteSpace(searchDto.Hashtag))
             {
                 query = query.Where(p => p.PostHashtags.Any(ph => ph.Hashtag!.Name == searchDto.Hashtag));
             }
 
-            // Category filter (simple, no hierarchy)
+            // Lọc theo danh mục (không phân cấp)
             if (searchDto.CategoryId.HasValue)
             {
                 query = query.Where(p => p.CategoryId.HasValue && p.CategoryId.Value == searchDto.CategoryId.Value);
@@ -90,7 +90,7 @@ namespace MentorEdu.Services.Implementations
             if (post == null)
                 return ServiceResult<CommunityPostDetailDto>.NotFoundResult("Post not found");
 
-            // Don't show hidden posts to non-authors
+            // Không hiển thị bài đã ẩn cho người không phải tác giả
             if (post.IsHidden && currentUserId != post.AuthorId)
                 return ServiceResult<CommunityPostDetailDto>.NotFoundResult("Post not found");
 
@@ -117,26 +117,31 @@ namespace MentorEdu.Services.Implementations
             await _unitOfWork.CommunityPosts.AddAsync(post);
             await _unitOfWork.SaveChangesAsync();
 
-            // Handle hashtags - create or lookup existing
+            // Xử lý hashtag — tạo mới hoặc tìm kiếm hashtag đã tồn tại
             if (request.Hashtags != null && request.Hashtags.Count > 0)
             {
-                foreach (var tagName in request.Hashtags.Take(10)) // Limit to 10 hashtags
+                var hashtags = new List<Hashtag>();
+                foreach (var tagName in request.Hashtags.Take(10)) // Giới hạn tối đa 10 hashtag
                 {
                     var normalizedName = tagName.Trim().ToLower().TrimStart('#');
                     if (string.IsNullOrEmpty(normalizedName)) continue;
 
-                    // Try to find existing hashtag
                     var hashtag = await _unitOfWork.Hashtags.GetByNameAsync(normalizedName);
-                    
                     if (hashtag == null)
                     {
-                        // Create new hashtag
+                        // Tạo hashtag mới — sẽ lưu sau khi kết thúc vòng lặp
                         hashtag = new Hashtag { Name = normalizedName };
                         await _unitOfWork.Hashtags.AddAsync(hashtag);
-                        await _unitOfWork.SaveChangesAsync();
                     }
+                    hashtags.Add(hashtag);
+                }
 
-                    // Create post-hashtag link
+                // Lưu một lần để sinh ID cho các hashtag mới được tạo
+                await _unitOfWork.SaveChangesAsync();
+
+                // Tạo liên kết giữa bài viết và hashtag
+                foreach (var hashtag in hashtags)
+                {
                     var postHashtag = new CommunityPostHashtag
                     {
                         PostId = post.Id,
@@ -147,10 +152,10 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.SaveChangesAsync();
             }
 
-            // Handle file attachments
+            // Xử lý các file đính kèm của bài viết
             if (request.FileUrls != null && request.FileUrls.Count > 0)
             {
-                foreach (var fileUrl in request.FileUrls.Take(2)) // Limit to 2 files
+                foreach (var fileUrl in request.FileUrls.Take(2)) // Giới hạn tối đa 2 file
                 {
                     if (string.IsNullOrEmpty(fileUrl)) continue;
 
@@ -160,7 +165,7 @@ namespace MentorEdu.Services.Implementations
                         ? "image" 
                         : "document";
 
-                    // Extract original filename from the URL (format: {guid}_{originalName}.ext)
+                    // Lấy tên file gốc từ URL (lịnh dạng: {guid}_{tênGốc}.ext)
                     var displayFileName = urlFileName;
                     var underscoreIndex = urlFileName.IndexOf('_');
                     if (underscoreIndex > 0 && underscoreIndex < urlFileName.Length - 1)
@@ -181,7 +186,7 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.SaveChangesAsync();
             }
 
-            // Notify mentors about relevant post based on category and hashtags
+            // Thông báo cho mentor về bài viết phù hợp dựa trên danh mục và hashtag
             await _notificationService.NotifyMentorsAboutRelevantPostAsync(
                 post.Id, 
                 request.CategoryId, 

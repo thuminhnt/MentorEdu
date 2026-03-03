@@ -19,7 +19,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get all requests with filters
+        /// Lấy tất cả yêu cầu theo bộ lọc
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<PagedResponse<RequestListDto>>>> GetRequests([FromQuery] SearchRequestDto request)
@@ -33,7 +33,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get open requests (for mentors to browse)
+        /// Lấy yêu cầu đang mở (dành cho mentor tìm kiếm)
         /// </summary>
         [HttpGet("open")]
         public async Task<ActionResult<ApiResponse<PagedResponse<RequestListDto>>>> GetOpenRequests([FromQuery] SearchRequestDto request)
@@ -47,7 +47,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get request detail by ID
+        /// Lấy chi tiết yêu cầu theo ID
         /// </summary>
         [HttpGet("{requestId}")]
         public async Task<ActionResult<ApiResponse<RequestDetailDto>>> GetRequestById(long requestId)
@@ -61,7 +61,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user's requests (students)
+        /// Lấy yêu cầu của người dùng hiện tại (học viên)
         /// </summary>
         [HttpGet("my-requests")]
         [Authorize]
@@ -79,7 +79,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a new request (students only)
+        /// Tạo yêu cầu mới (chỉ học viên)
         /// </summary>
         [HttpPost]
         [Authorize]
@@ -98,7 +98,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update a request
+        /// Cập nhật yêu cầu
         /// </summary>
         [HttpPut("{requestId}")]
         [Authorize]
@@ -117,7 +117,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a request
+        /// Xóa yêu cầu
         /// </summary>
         [HttpDelete("{requestId}")]
         [Authorize]
@@ -133,7 +133,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Close a request
+        /// Đóng yêu cầu
         /// </summary>
         [HttpPost("{requestId}/close")]
         [Authorize]
@@ -149,7 +149,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get requests received by mentor
+        /// Lấy yêu cầu nhận được bởi mentor
         /// </summary>
         [HttpGet("received")]
         [Authorize]
@@ -167,7 +167,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Accept a request (mentor only)
+        /// Chấp nhận yêu cầu (chỉ mentor)
         /// </summary>
         [HttpPost("{requestId}/accept")]
         [Authorize]
@@ -183,7 +183,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Reject a request (mentor only)
+        /// Từ chối yêu cầu (chỉ mentor)
         /// </summary>
         [HttpPost("{requestId}/reject")]
         [Authorize]

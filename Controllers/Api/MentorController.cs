@@ -20,7 +20,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Search mentors with filters
+        /// Tìm kiếm mentor theo bộ lọc
         /// </summary>
         [HttpGet("search")]
         public async Task<ActionResult<ApiResponse<PagedResponse<MentorListDto>>>> SearchMentors([FromQuery] SearchMentorRequest request)
@@ -34,7 +34,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get mentor detail by ID
+        /// Lấy chi tiết mentor theo ID
         /// </summary>
         [HttpGet("{mentorId}")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> GetMentorDetail(long mentorId)
@@ -48,7 +48,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get top rated mentors
+        /// Lấy các mentor được đánh giá cao nhất
         /// </summary>
         [HttpGet("top")]
         public async Task<ActionResult<ApiResponse<List<MentorListDto>>>> GetTopMentors([FromQuery] int count = 10)
@@ -62,7 +62,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get mentors by category
+        /// Lấy mentor theo danh mục
         /// </summary>
         [HttpGet("category/{categoryId}")]
         public async Task<ActionResult<ApiResponse<List<MentorListDto>>>> GetMentorsByCategory(long categoryId)
@@ -76,7 +76,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get mentor reviews
+        /// Lấy đánh giá của mentor
         /// </summary>
         [HttpGet("{mentorId}/reviews")]
         public async Task<ActionResult<ApiResponse<PagedResponse<MentorReviewDto>>>> GetMentorReviews(
@@ -93,7 +93,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get mentor review summary
+        /// Lấy tóm tắt đánh giá của mentor
         /// </summary>
         [HttpGet("{mentorId}/reviews/summary")]
         public async Task<ActionResult<ApiResponse<ReviewSummaryDto>>> GetMentorReviewSummary(long mentorId)
@@ -109,14 +109,14 @@ namespace MentorEdu.Controllers.Api
         #region Mentor Application Flow
 
         /// <summary>
-        /// Apply to become a mentor (Student only)
+        /// Nộp hồ sơ đăng ký trở thành mentor (chỉ học viên)
         /// </summary>
         [HttpPost("apply")]
         [Authorize(Roles = "Student")]
         public async Task<ActionResult<ApiResponse>> Apply([FromBody] ApplyAsMentorRequest request)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!long.TryParse(userIdClaim, out var userId))
+            var userId = GetCurrentUserId();
+            if (userId == 0)
                 return Unauthorized(ApiResponse.FailResponse("Invalid user"));
 
             var result = await _mentorService.ApplyAsMentorAsync(userId, request);
@@ -128,14 +128,14 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current mentor application status
+        /// Lấy trạng thái đăng ký mentor hiện tại
         /// </summary>
         [HttpGet("application-status")]
         [Authorize]
         public async Task<ActionResult<ApiResponse<MentorApplicationStatusDto>>> GetApplicationStatus()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!long.TryParse(userIdClaim, out var userId))
+            var userId = GetCurrentUserId();
+            if (userId == 0)
                 return Unauthorized(ApiResponse<MentorApplicationStatusDto>.FailResponse("Invalid user"));
 
             var result = await _mentorService.GetApplicationStatusAsync(userId);
@@ -147,14 +147,14 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Confirm switching role from Student to Mentor (after admin approval)
+        /// Xác nhận chuyển vai trò từ Học viên sang Mentor (sau khi admin phê duyệt)
         /// </summary>
         [HttpPost("confirm-switch")]
         [Authorize(Roles = "Student")]
         public async Task<ActionResult<ApiResponse>> ConfirmSwitch()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!long.TryParse(userIdClaim, out var userId))
+            var userId = GetCurrentUserId();
+            if (userId == 0)
                 return Unauthorized(ApiResponse.FailResponse("Invalid user"));
 
             var result = await _mentorService.ConfirmSwitchToMentorAsync(userId);
@@ -166,5 +166,11 @@ namespace MentorEdu.Controllers.Api
         }
 
         #endregion
+
+        private long GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return long.TryParse(userIdClaim, out var userId) ? userId : 0;
+        }
     }
 }

@@ -20,7 +20,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get proposal by ID
+        /// Lấy đề xuất theo ID
         /// </summary>
         [HttpGet("{proposalId}")]
         public async Task<ActionResult<ApiResponse<ProposalDetailDto>>> GetProposalById(long proposalId)
@@ -34,7 +34,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get proposals for a request
+        /// Lấy danh sách đề xuất của một yêu cầu
         /// </summary>
         [HttpGet("request/{requestId}")]
         public async Task<ActionResult<ApiResponse<List<ProposalListDto>>>> GetProposalsByRequest(long requestId)
@@ -48,7 +48,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current mentor's proposals
+        /// Lấy đề xuất của mentor hiện tại
         /// </summary>
         [HttpGet("my-proposals")]
         public async Task<ActionResult<ApiResponse<PagedResponse<ProposalListDto>>>> GetMyProposals(
@@ -65,7 +65,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a new proposal (mentors only)
+        /// Tạo đề xuất mới (chỉ mentor)
         /// </summary>
         [HttpPost]
         public async Task<ActionResult<ApiResponse<ProposalDetailDto>>> CreateProposal([FromBody] CreateProposalDto request)
@@ -83,7 +83,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update a proposal
+        /// Cập nhật đề xuất
         /// </summary>
         [HttpPut("{proposalId}")]
         public async Task<ActionResult<ApiResponse<ProposalDetailDto>>> UpdateProposal(long proposalId, [FromBody] UpdateProposalDto request)
@@ -101,7 +101,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Cancel a proposal (mentor only)
+        /// Hủy đề xuất (chỉ mentor)
         /// </summary>
         [HttpPost("{proposalId}/cancel")]
         public async Task<ActionResult<ApiResponse>> CancelProposal(long proposalId)
@@ -116,7 +116,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Accept a proposal (student only)
+        /// Chấp nhận đề xuất (chỉ học viên)
         /// </summary>
         [HttpPost("{proposalId}/accept")]
         public async Task<ActionResult<ApiResponse<AcceptProposalResultDto>>> AcceptProposal(long proposalId)
@@ -131,7 +131,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Reject a proposal (student only)
+        /// Từ chối đề xuất (chỉ học viên)
         /// </summary>
         [HttpPost("{proposalId}/reject")]
         public async Task<ActionResult<ApiResponse>> RejectProposal(long proposalId, [FromBody] RejectProposalRequest? request = null)

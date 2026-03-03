@@ -1,5 +1,6 @@
 ﻿using MentorEdu.Data;
 using MentorEdu.Hubs;
+using MentorEdu.Middleware;
 using MentorEdu.Models;
 using MentorEdu.Repositories.Implementations;
 using MentorEdu.Repositories.Interfaces;
@@ -146,7 +147,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000", "http://localhost:5173")
+        //.WithOrigins("http://localhost:5173")
+            .SetIsOriginAllowed(_ => true) // Allow all origins (dev)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials(); // Required for SignalR
@@ -157,37 +159,13 @@ builder.Services.AddCors(options =>
 // REPOSITORIES
 // =======================
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
-builder.Services.AddScoped<IMentorProfileRepository, MentorProfileRepository>();
-builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
-builder.Services.AddScoped<IHashtagRepository, HashtagRepository>();
-builder.Services.AddScoped<IRequestRepository, RequestRepository>();
-builder.Services.AddScoped<IProposalRepository, ProposalRepository>();
-builder.Services.AddScoped<IOrderRepository, OrderRepository>();
-builder.Services.AddScoped<IOrderDetailRepository, OrderDetailRepository>();
-builder.Services.AddScoped<IWorkSessionRepository, WorkSessionRepository>();
-builder.Services.AddScoped<ISessionTrackingRepository, SessionTrackingRepository>();
-builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
-builder.Services.AddScoped<IMessageRepository, MessageRepository>();
-builder.Services.AddScoped<IWalletRepository, WalletRepository>();
-builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
-builder.Services.AddScoped<IEscrowRepository, EscrowRepository>();
-builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
-builder.Services.AddScoped<IReportRepository, ReportRepository>();
-builder.Services.AddScoped<ICommunityPostRepository, CommunityPostRepository>();
-builder.Services.AddScoped<ICommunityCommentRepository, CommunityCommentRepository>();
-builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
-builder.Services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
-builder.Services.AddScoped<IWorkSessionService, WorkSessionService>();
-builder.Services.AddScoped<IGroupRepository, GroupRepository>();
-builder.Services.AddScoped<IGroupMemberRepository, GroupMemberRepository>();
-builder.Services.AddScoped<IGroupMessageRepository, GroupMessageRepository>();
-builder.Services.AddScoped<IAIChatRepository, AIChatRepository>();
-// =======================
-// UNIT OF WORK
-// =======================
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+// Auto-register tất cả Repositories + UnitOfWork qua assembly scan (Scrutor)
+builder.Services.Scan(scan => scan
+    .FromAssemblyOf<UserRepository>()
+    .AddClasses(c => c.InNamespaces("MentorEdu.Repositories.Implementations")
+        .Where(t => !t.IsGenericTypeDefinition))
+    .AsImplementedInterfaces()
+    .WithScopedLifetime());
 
 // =======================
 // MOMO SETTINGS
@@ -213,30 +191,22 @@ builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Emai
 // SERVICES
 // =======================
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<IGeminiAiService, GeminiAiService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IMentorService, MentorService>();
-builder.Services.AddScoped<IAdminService, AdminService>();
-builder.Services.AddScoped<IRequestService, RequestService>();
-builder.Services.AddScoped<IProposalService, ProposalService>();
-builder.Services.AddScoped<IOrderService, OrderService>();
-builder.Services.AddScoped<IWalletService, WalletService>();
-builder.Services.AddScoped<ICommunityService, CommunityService>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddScoped<IChatService, ChatService>();
-builder.Services.AddScoped<IGroupService, GroupService>();
-builder.Services.AddScoped<IAIChatService, AIChatService>();
-builder.Services.AddScoped<IMoMoPaymentService, MoMoPaymentService>();
-builder.Services.AddScoped<IVNPayPaymentService, VNPayPaymentService>();
-builder.Services.AddScoped<IVietQRService, VietQRService>();
+// Auto-register tất cả Services qua assembly scan (Scrutor)
+builder.Services.Scan(scan => scan
+    .FromAssemblyOf<AuthService>()
+    .AddClasses(c => c.InNamespaces("MentorEdu.Services.Implementations")
+        .Where(t => t.IsClass && !t.IsAbstract && !t.IsGenericTypeDefinition && !typeof(Exception).IsAssignableFrom(t)))
+    .AsImplementedInterfaces()
+    .WithScopedLifetime());
 builder.Services.AddHttpContextAccessor();
 
 // =======================
 // APP
 // =======================
 var app = builder.Build();
+
+// Global Exception Handler — đặt đầu pipeline để bắt tất cả exception
+app.UseGlobalExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
@@ -254,7 +224,6 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 
@@ -265,7 +234,6 @@ app.UseRouting();
 
 // CORS phải đặt TRƯỚC Auth
 app.UseCors("AllowReactApp");
-app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -293,6 +261,24 @@ using (var scope = app.Services.CreateScope())
     await context.Database.MigrateAsync();
     
     await DbSeeder.SeedAsync(context);
+
+    // Recalculate mentor ratings from Reviews table (fix stale/zero ratingAvg)
+    var mentorProfiles = await context.MentorProfiles.ToListAsync();
+    foreach (var mp in mentorProfiles)
+    {
+        var reviewStats = await context.Reviews
+            .Where(r => r.ToUserId == mp.UserId)
+            .GroupBy(r => r.ToUserId)
+            .Select(g => new { Avg = g.Average(r => (double)r.Rating), Count = g.Count() })
+            .FirstOrDefaultAsync();
+
+        if (reviewStats != null)
+        {
+            mp.RatingAvg = (decimal)reviewStats.Avg;
+            mp.RatingCount = reviewStats.Count;
+        }
+    }
+    await context.SaveChangesAsync();
 }
 
 app.Run();

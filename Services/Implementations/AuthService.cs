@@ -17,17 +17,20 @@ namespace MentorEdu.Services.Implementations
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
         private readonly IVerificationTokenRepository _tokenRepository;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             IUnitOfWork unitOfWork, 
             IConfiguration configuration,
             IEmailService emailService,
-            IVerificationTokenRepository tokenRepository) 
+            IVerificationTokenRepository tokenRepository,
+            ILogger<AuthService> logger) 
             : base(unitOfWork)
         {
             _configuration = configuration;
             _emailService = emailService;
             _tokenRepository = tokenRepository;
+            _logger = logger;
         }
 
         public async Task<ServiceResult<LoginResponse>> LoginAsync(LoginRequest request)
@@ -37,7 +40,7 @@ namespace MentorEdu.Services.Implementations
             if (user == null)
                 return ServiceResult<LoginResponse>.FailResult("Invalid email or password", 401);
 
-            if (!VerifyPassword(request.Password, user.PasswordHash))
+            if (!PasswordHelper.Verify(request.Password, user.PasswordHash))
                 return ServiceResult<LoginResponse>.FailResult("Invalid email or password", 401);
 
             if (!user.IsActive)
@@ -48,7 +51,7 @@ namespace MentorEdu.Services.Implementations
 
             var userProfile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
             
-            // Get mentor status if exists
+            // Lấy trạng thái mentor nếu tồn tại (Login)
             MentorApprovalStatus? mentorStatus = null;
             var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(user.Id);
             if (mentorProfile != null)
@@ -58,6 +61,10 @@ namespace MentorEdu.Services.Implementations
 
             var token = GenerateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+            await _unitOfWork.SaveChangesAsync();
 
             var response = new LoginResponse
             {
@@ -77,17 +84,17 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult<LoginResponse>> RegisterAsync(RegisterRequest request)
         {
-            // Check email exists
+            // Kiểm tra email đã tồn tại chưa
             if (await _unitOfWork.Users.EmailExistsAsync(request.Email))
                 return ServiceResult<LoginResponse>.FailResult("Email already exists");
 
             return await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
-                // Create user as Student
+                // Tạo người dùng với vai trò Học viên
                 var user = new User
                 {
                     Email = request.Email,
-                    PasswordHash = HashPassword(request.Password),
+                    PasswordHash = PasswordHelper.Hash(request.Password),
                     Role = UserRole.Student,
                     IsVerified = false,
                     IsActive = true,
@@ -98,7 +105,7 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Users.AddAsync(user);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Create user profile
+                // Tạo hồ sơ người dùng
                 var userProfile = new UserProfile
                 {
                     UserId = user.Id,
@@ -109,7 +116,7 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.UserProfiles.AddAsync(userProfile);
 
-                // Create wallet
+                // Tạo ví điện tử
                 var wallet = new Wallet
                 {
                     UserId = user.Id,
@@ -122,7 +129,7 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.Wallets.AddAsync(wallet);
 
-                // Create verification token
+                // Tạo token xác minh email
                 var verificationToken = new VerificationToken
                 {
                     UserId = user.Id,
@@ -136,18 +143,22 @@ namespace MentorEdu.Services.Implementations
                 await _tokenRepository.AddAsync(verificationToken);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Send verification email (don't fail registration if email fails)
+                // Gửi email xác minh (không còn lỗi đăng ký nếu gửi email thất bại)
                 try
                 {
                     await _emailService.SendVerificationEmailAsync(user.Email, request.FullName, verificationToken.Token);
                 }
                 catch (Exception)
                 {
-                    // Log error but don't fail registration
+                    // Ghi log lỗi nhưng không huỷ đăng ký
                 }
 
                 var token = GenerateJwtToken(user);
                 var refreshToken = GenerateRefreshToken();
+
+                user.RefreshToken = refreshToken;
+                user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+                await _unitOfWork.SaveChangesAsync();
 
                 var response = new LoginResponse
                 {
@@ -168,8 +179,15 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<ServiceResult> LogoutAsync(long userId)
         {
-            // TODO: Invalidate refresh token in database
-            await Task.CompletedTask;
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+                return ServiceResult.NotFoundResult("User not found");
+
+            user.RefreshToken = null;
+            user.RefreshTokenExpiry = null;
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} ({Email}) logged out at {Time}", userId, user.Email, DateTime.UtcNow);
             return ServiceResult.SuccessResult("Logout successful");
         }
 
@@ -180,14 +198,14 @@ namespace MentorEdu.Services.Implementations
             if (user == null)
                 return ServiceResult.NotFoundResult("User not found");
 
-            if (!VerifyPassword(request.CurrentPassword, user.PasswordHash))
+            if (!PasswordHelper.Verify(request.CurrentPassword, user.PasswordHash))
                 return ServiceResult.FailResult("Current password is incorrect");
 
-            // Check if new password is the same as current password
-            if (VerifyPassword(request.NewPassword, user.PasswordHash))
+            // Kiểm tra mật khẩu mới có trùng với mật khẩu hiện tại không
+            if (PasswordHelper.Verify(request.NewPassword, user.PasswordHash))
                 return ServiceResult.FailResult("New password cannot be the same as your current password");
 
-            user.PasswordHash = HashPassword(request.NewPassword);
+            user.PasswordHash = PasswordHelper.Hash(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.Users.Update(user);
@@ -203,10 +221,10 @@ namespace MentorEdu.Services.Implementations
             if (user == null)
                 return ServiceResult.SuccessResult("If the email address exists, you will receive a password reset link.");
 
-            // Invalidate old tokens
+            // Hủy bỏ các token cũ
             await _tokenRepository.InvalidateAllTokensForUserAsync(user.Id, TokenType.PasswordReset);
 
-            // Create new reset token
+            // Tạo token đặt lại mật khẩu mới
             var resetToken = new VerificationToken
             {
                 UserId = user.Id,
@@ -226,9 +244,10 @@ namespace MentorEdu.Services.Implementations
             {
                 await _emailService.SendPasswordResetEmailAsync(user.Email, userProfile?.FullName ?? "User", resetToken.Token);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Log error but return success to prevent email enumeration
+                // Log lỗi nhưng trả về thành công để tránh đoán email (email enumeration)
+                _logger.LogError(ex, "Failed to send password reset email to {Email}", user.Email);
             }
 
             return ServiceResult.SuccessResult("If the email exists, you will receive a password reset link");
@@ -245,11 +264,11 @@ namespace MentorEdu.Services.Implementations
             if (user == null)
                 return ServiceResult.FailResult("User not found");
 
-            // Check if new password is the same as current password
-            if (VerifyPassword(request.NewPassword, user.PasswordHash))
+            // Kiểm tra mật khẩu mới có trùng với mật khẩu hiện tại không
+            if (PasswordHelper.Verify(request.NewPassword, user.PasswordHash))
                 return ServiceResult.FailResult("New password cannot be the same as your current password");
 
-            user.PasswordHash = HashPassword(request.NewPassword);
+            user.PasswordHash = PasswordHelper.Hash(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
             tokenEntity.IsUsed = true;
@@ -275,10 +294,19 @@ namespace MentorEdu.Services.Implementations
             if (user == null || !user.IsActive)
                 return ServiceResult<LoginResponse>.UnauthorizedResult("Invalid token");
 
+            // Xác thực refresh token đang lưu trữ
+            if (user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiry < DateTime.UtcNow)
+                return ServiceResult<LoginResponse>.UnauthorizedResult("Invalid or expired refresh token");
+
             var userProfile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user.Id);
 
             var newToken = GenerateJwtToken(user);
             var newRefreshToken = GenerateRefreshToken();
+
+            // Xoay vòng refresh token (cấp phát mới sau mỗi lần làm mới)
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+            await _unitOfWork.SaveChangesAsync();
 
             var response = new LoginResponse
             {
@@ -301,7 +329,7 @@ namespace MentorEdu.Services.Implementations
             
             if (tokenEntity == null)
             {
-                // Token is invalid or expired - but check if user is already verified
+                // Token không hợp lệ hoặc hết hạn — kiểm tra xem email đã được xác minh chưa
                 var existingUser = await _unitOfWork.Users.GetByEmailAsync(email);
                 if (existingUser != null && existingUser.IsVerified)
                 {
@@ -338,10 +366,10 @@ namespace MentorEdu.Services.Implementations
             if (user.IsVerified)
                 return ServiceResult.FailResult("Email has already been verified");
 
-            // Invalidate old tokens
+            // Hủy bỏ các token xác minh cũ
             await _tokenRepository.InvalidateAllTokensForUserAsync(user.Id, TokenType.EmailVerification);
 
-            // Create new verification token
+            // Tạo token xác minh email mới
             var verificationToken = new VerificationToken
             {
                 UserId = user.Id,
@@ -363,7 +391,7 @@ namespace MentorEdu.Services.Implementations
             }
             catch (Exception)
             {
-                // Log error but return success
+                // Ghi log lỗi nhưng vẫn trả về thành công (gửi lại mail)
             }
 
             return ServiceResult.SuccessResult("Verification email has been resent. Please check your inbox.");
@@ -448,23 +476,13 @@ namespace MentorEdu.Services.Implementations
             }
         }
 
-        private static string HashPassword(string password)
-        {
-            return BCrypt.Net.BCrypt.HashPassword(password);
-        }
-
-        private static bool VerifyPassword(string password, string passwordHash)
-        {
-            return BCrypt.Net.BCrypt.Verify(password, passwordHash);
-        }
-
         #endregion
 
         #region Google OAuth
 
         public async Task<ServiceResult<LoginResponse>> GoogleLoginAsync(string email, string name, string? avatarUrl, UserRole? role = null, bool isRegisterRequest = false)
         {
-            // Check if user exists
+            // Kiểm tra người dùng đã tồn tại chưa
             var user = await _unitOfWork.Users.GetByEmailAsync(email);
             
             if (user != null && isRegisterRequest)
@@ -474,15 +492,15 @@ namespace MentorEdu.Services.Implementations
 
             if (user == null)
             {
-                // Create new user from Google account - ALWAYS as Student
+                // Tạo người dùng mới từ tài khoản Google — luôn là Học viên
                 await _unitOfWork.ExecuteWithStrategyAsync(async () =>
                 {
                     user = new User
                     {
                         Email = email,
-                        PasswordHash = HashPassword(Guid.NewGuid().ToString()), // Random password for OAuth users
-                        Role = UserRole.Student, // Always Student - can apply for mentor later
-                        IsVerified = true, // Google accounts are pre-verified
+                        PasswordHash = PasswordHelper.Hash(Guid.NewGuid().ToString()), // Mật khẩu ngẫo đối với người dùng OAuth
+                        Role = UserRole.Student, // Luôn là Học viên — có thể đăng ký làm mentor sau
+                        IsVerified = true, // Tài khoản Google được xác minh trước rồi
                         IsActive = true,
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
@@ -491,7 +509,7 @@ namespace MentorEdu.Services.Implementations
                     await _unitOfWork.Users.AddAsync(user);
                     await _unitOfWork.SaveChangesAsync();
 
-                    // Create user profile
+                    // Tạo hồ sơ người dùng (Google)
                     var userProfile = new UserProfile
                     {
                         UserId = user.Id,
@@ -503,7 +521,7 @@ namespace MentorEdu.Services.Implementations
 
                     await _unitOfWork.UserProfiles.AddAsync(userProfile);
 
-                    // Create wallet
+                    // Tạo ví điện tử (Google)
                     var wallet = new Wallet
                     {
                         UserId = user.Id,
@@ -523,11 +541,11 @@ namespace MentorEdu.Services.Implementations
                 return ServiceResult<LoginResponse>.FailResult("Account has been locked", 403);
             }
 
-            // Get user profile for full name and avatar
-            // User is guaranteed to exist at this point (either found or created above)
+            // Lấy hồ sơ người dùng để lấy tên và ảnh đại diện
+            // Tại điểm này người dùng luôn tồn tại (tìm thấy hoặc vừa tạo mới)
             var profile = await _unitOfWork.UserProfiles.GetByUserIdAsync(user!.Id);
             
-            // Get mentor status if exists
+            // Lấy trạng thái mentor nếu tồn tại (Google Login)
             MentorApprovalStatus? mentorStatus = null;
             var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(user.Id);
             if (mentorProfile != null)
@@ -535,9 +553,13 @@ namespace MentorEdu.Services.Implementations
                 mentorStatus = mentorProfile.ApprovalStatus;
             }
 
-            // Generate tokens
+            // Tạo JWT và refresh token mới
             var token = GenerateJwtToken(user);
             var refreshToken = GenerateRefreshToken();
+
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(30);
+            await _unitOfWork.SaveChangesAsync();
 
             var response = new LoginResponse
             {

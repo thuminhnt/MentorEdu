@@ -1,7 +1,7 @@
 namespace MentorEdu.DTOs.Category
 {
     /// <summary>
-    /// Represents a category with its mapped hashtags (grouped view)
+    /// Danh mục kèm hashtag đã ánh xạ (dạng nhóm)
     /// </summary>
     public class CategoryHashtagMappingDto
     {
@@ -11,7 +11,7 @@ namespace MentorEdu.DTOs.Category
     }
 
     /// <summary>
-    /// Detail of a category with its mapped hashtags
+    /// Chi tiết danh mục kèm hashtag đã ánh xạ
     /// </summary>
     public class CategoryHashtagDetailDto
     {
@@ -22,7 +22,7 @@ namespace MentorEdu.DTOs.Category
     }
 
     /// <summary>
-    /// Simple hashtag DTO for category mapping
+    /// DTO hashtag đơn giản dùng cho ánh xạ danh mục
     /// </summary>
     public class CategoryHashtagItemDto
     {
@@ -31,7 +31,7 @@ namespace MentorEdu.DTOs.Category
     }
 
     /// <summary>
-    /// Request to add a hashtag mapping to a category
+    /// Yêu cầu thêm ánh xạ hashtag vào danh mục
     /// </summary>
     public class AddCategoryHashtagDto
     {
@@ -40,7 +40,7 @@ namespace MentorEdu.DTOs.Category
     }
 
     /// <summary>
-    /// Request to remove a hashtag mapping from a category
+    /// Yêu cầu xóa ánh xạ hashtag khỏi danh mục
     /// </summary>
     public class RemoveCategoryHashtagDto
     {

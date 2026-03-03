@@ -12,12 +12,12 @@ namespace MentorEdu.Services.Interfaces
     public interface IMoMoPaymentService
     {
         /// <summary>
-        /// Create a MoMo payment request and get the payment URL
+        /// Tạo yêu cầu thanh toán MoMo và lấy URL thanh toán
         /// </summary>
         Task<MoMoPaymentResponse> CreatePaymentAsync(string orderId, long amount, string orderInfo, string? returnUrl = null);
 
         /// <summary>
-        /// Validate the HMAC-SHA256 signature from MoMo callback/IPN
+        /// Xác thực chữ ký HMAC-SHA256 từ callback/IPN của MoMo
         /// </summary>
         bool ValidateCallback(Dictionary<string, string> callbackData, string signature);
     }

@@ -23,9 +23,9 @@ namespace MentorEdu.Repositories.Implementations
         {
             return await _dbSet
                 .Where(e => e.Status == status)
-                .Include(e => e.Order)
+                .Include(e => e.Order!)
                     .ThenInclude(o => o.Student)
-                .Include(e => e.Order)
+                .Include(e => e.Order!)
                     .ThenInclude(o => o.Mentor)
                 .OrderByDescending(e => e.CreatedAt)
                 .ToListAsync();

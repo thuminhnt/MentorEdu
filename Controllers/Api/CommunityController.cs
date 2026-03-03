@@ -21,7 +21,7 @@ namespace MentorEdu.Controllers.Api
         #region Posts
 
         /// <summary>
-        /// Get all posts with pagination
+        /// Lấy tất cả bài viết có phân trang
         /// </summary>
         [HttpGet("posts")]
         public async Task<ActionResult<ApiResponse<PagedResponse<CommunityPostListDto>>>> GetPosts([FromQuery] SearchPostDto request)
@@ -36,7 +36,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get recent posts
+        /// Lấy bài viết mới nhất
         /// </summary>
         [HttpGet("posts/recent")]
         public async Task<ActionResult<ApiResponse<List<CommunityPostListDto>>>> GetRecentPosts([FromQuery] int count = 10)
@@ -51,7 +51,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get trending hashtags with post counts
+        /// Lấy hashtag nổi bật kèm số bài viết
         /// </summary>
         [HttpGet("trending-hashtags")]
         public async Task<ActionResult<ApiResponse<List<TrendingHashtagDto>>>> GetTrendingHashtags([FromQuery] int count = 10)
@@ -65,7 +65,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get post detail by ID
+        /// Lấy chi tiết bài viết theo ID
         /// </summary>
         [HttpGet("posts/{postId}")]
         public async Task<ActionResult<ApiResponse<CommunityPostDetailDto>>> GetPostById(long postId)
@@ -80,7 +80,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user's posts
+        /// Lấy bài viết của người dùng hiện tại
         /// </summary>
         [HttpGet("posts/my-posts")]
         [Authorize]
@@ -98,7 +98,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a new post
+        /// Tạo bài viết mới
         /// </summary>
         [HttpPost("posts")]
         [Authorize]
@@ -117,7 +117,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update a post
+        /// Cập nhật bài viết
         /// </summary>
         [HttpPut("posts/{postId}")]
         [Authorize]
@@ -136,7 +136,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a post
+        /// Xóa bài viết
         /// </summary>
         [HttpDelete("posts/{postId}")]
         [Authorize]
@@ -156,7 +156,7 @@ namespace MentorEdu.Controllers.Api
         #region Comments
 
         /// <summary>
-        /// Get comments for a post
+        /// Lấy bình luận của bài viết
         /// </summary>
         [HttpGet("posts/{postId}/comments")]
         public async Task<ActionResult<ApiResponse<PagedResponse<CommunityCommentDto>>>> GetComments(
@@ -173,7 +173,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a comment on a post
+        /// Tạo bình luận cho bài viết
         /// </summary>
         [HttpPost("posts/{postId}/comments")]
         [Authorize]
@@ -197,7 +197,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a comment
+        /// Xóa bình luận
         /// </summary>
         [HttpDelete("comments/{commentId}")]
         [Authorize]
@@ -217,7 +217,7 @@ namespace MentorEdu.Controllers.Api
         #region Proposals
 
         /// <summary>
-        /// Get following users' posts
+        /// Lấy bài viết của những người đang theo dõi
         /// </summary>
         [HttpGet("posts/following")]
         [Authorize]
@@ -235,7 +235,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Send proposal to a post (Mentor only)
+        /// Gửi đề xuất cho bài viết (chỉ Mentor)
         /// </summary>
         [HttpPost("posts/{postId}/proposals")]
         [Authorize]
@@ -254,7 +254,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get proposals for a post
+        /// Lấy danh sách đề xuất của bài viết
         /// </summary>
         [HttpGet("posts/{postId}/proposals")]
         [Authorize]
@@ -269,7 +269,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Accept a proposal (Post author only)
+        /// Chấp nhận đề xuất (chỉ tác giả bài viết)
         /// </summary>
         [HttpPut("proposals/{proposalId}/accept")]
         [Authorize]
@@ -285,7 +285,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Reject a proposal (Post author only)
+        /// Từ chối đề xuất (chỉ tác giả bài viết)
         /// </summary>
         [HttpPut("proposals/{proposalId}/reject")]
         [Authorize]
@@ -301,7 +301,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get my sent proposals (Mentor)
+        /// Lấy các đề xuất đã gửi (Mentor)
         /// </summary>
         [HttpGet("proposals/my-proposals")]
         [Authorize]
@@ -317,7 +317,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get proposals received for my posts (Student)
+        /// Lấy đề xuất nhận được cho bài viết của tôi (Học viên)
         /// </summary>
         [HttpGet("proposals/received")]
         [Authorize]
@@ -337,7 +337,7 @@ namespace MentorEdu.Controllers.Api
         #region Follow
 
         /// <summary>
-        /// Follow a user
+        /// Theo dõi một người dùng
         /// </summary>
         [HttpPost("follow/{userId}")]
         [Authorize]
@@ -353,7 +353,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Unfollow a user
+        /// Bỏ theo dõi một người dùng
         /// </summary>
         [HttpDelete("follow/{userId}")]
         [Authorize]
@@ -369,7 +369,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Check if following a user
+        /// Kiểm tra xem có đang theo dõi người dùng không
         /// </summary>
         [HttpGet("follow/{userId}/status")]
         [Authorize]
@@ -385,7 +385,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get followers count and list for a user
+        /// Lấy số lượng và danh sách người theo dõi của người dùng
         /// </summary>
         [HttpGet("follow/{userId}/followers")]
         public async Task<ActionResult<ApiResponse<FollowListDto>>> GetFollowers(long userId)
@@ -399,7 +399,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get following count and list for a user
+        /// Lấy số lượng và danh sách đang theo dõi của người dùng
         /// </summary>
         [HttpGet("follow/{userId}/following")]
         public async Task<ActionResult<ApiResponse<FollowListDto>>> GetFollowing(long userId)

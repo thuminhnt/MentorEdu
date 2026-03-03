@@ -2,7 +2,7 @@ namespace MentorEdu.Services.Interfaces
 {
     public class VietQRResponse
     {
-        public string? QrDataUrl { get; set; }     // Base64 QR image or URL
+        public string? QrDataUrl { get; set; }     // Ảnh QR dạng Base64 hoặc URL
         public string? BankId { get; set; }
         public string? AccountNo { get; set; }
         public string? AccountName { get; set; }
@@ -15,7 +15,7 @@ namespace MentorEdu.Services.Interfaces
     public interface IVietQRService
     {
         /// <summary>
-        /// Generate a VietQR bank transfer QR code
+        /// Tạo mã QR chuyển khoản ngân hàng VietQR
         /// </summary>
         Task<VietQRResponse> GenerateQRAsync(decimal amount, string description);
     }

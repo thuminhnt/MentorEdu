@@ -10,17 +10,17 @@ namespace MentorEdu.Services.Interfaces
     public interface IVNPayPaymentService
     {
         /// <summary>
-        /// Create a VNPay payment URL for the user to redirect to
+        /// Tạo URL thanh toán VNPay để người dùng chuyển hướng đến
         /// </summary>
         string CreatePaymentUrl(string orderId, long amount, string orderInfo, string clientIpAddress, string? returnUrl = null);
 
         /// <summary>
-        /// Validate the HMAC-SHA512 signature from VNPay callback/IPN
+        /// Xác thực chữ ký HMAC-SHA512 từ callback/IPN của VNPay
         /// </summary>
         bool ValidateCallback(IQueryCollection queryParams);
 
         /// <summary>
-        /// Parse VNPay return/IPN query parameters into a dictionary
+        /// Phân tích tham số query từ trang trả về/IPN của VNPay thành dictionary
         /// </summary>
         Dictionary<string, string> ParseCallbackData(IQueryCollection queryParams);
     }

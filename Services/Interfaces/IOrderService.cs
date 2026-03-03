@@ -8,7 +8,7 @@ namespace MentorEdu.Services.Interfaces
 {
     public interface IOrderService
     {
-        // Order CRUD
+        // CRUD đơn hàng
         Task<ServiceResult<OrderDetailDto>> GetByIdAsync(long orderId, long userId);
         Task<ServiceResult<PagedResponse<OrderListDto>>> GetMyOrdersAsync(long userId, bool isMentor, SearchOrderDto searchDto);
         Task<ServiceResult> UpdateOrderStatusAsync(long orderId, long userId, UpdateOrderStatusDto request);
@@ -16,13 +16,13 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult> CompleteOrderAsync(long orderId, long userId);
         Task<ServiceResult> DisputeOrderAsync(long orderId, long userId, string reason);
         
-        // Work Sessions
+        // Phiên làm việc
         Task<ServiceResult<WorkSessionDetailDto>> StartWorkSessionAsync(long userId, StartWorkSessionDto request);
         Task<ServiceResult<WorkSessionDetailDto>> EndWorkSessionAsync(long userId, EndWorkSessionDto request);
         Task<ServiceResult<WorkSessionDetailDto>> ResumeWorkSessionAsync(long userId, ResumeWorkSessionDto request);
         Task<ServiceResult<WorkSessionSummaryDto>> GetWorkSessionSummaryAsync(long orderId);
         
-        // Reviews
+        // Đánh giá
         Task<ServiceResult<ReviewDto>> CreateReviewAsync(long userId, CreateReviewDto request);
         Task<ServiceResult<List<ReviewDto>>> GetOrderReviewsAsync(long orderId);
     }

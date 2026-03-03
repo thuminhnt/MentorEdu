@@ -26,7 +26,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Register a new account
+        /// Đăng ký tài khoản mới
         /// </summary>
         [HttpPost("register")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Register([FromBody] RegisterRequest request)
@@ -43,35 +43,24 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Login to account
+        /// Đăng nhập tài khoản
         /// </summary>
         [HttpPost("login")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromBody] LoginRequest request)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ApiResponse<LoginResponse>.FailResponse("Invalid request data"));
+            if (!ModelState.IsValid)
+                return BadRequest(ApiResponse<LoginResponse>.FailResponse("Invalid request data"));
 
-                var result = await _authService.LoginAsync(request);
+            var result = await _authService.LoginAsync(request);
 
-                if (!result.Success)
-                    return StatusCode(result.StatusCode, ApiResponse<LoginResponse>.FailResponse(result.Message ?? ""));
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<LoginResponse>.FailResponse(result.Message ?? ""));
 
-                return Ok(ApiResponse<LoginResponse>.SuccessResponse(result.Data!, result.Message));
-
-            }
-            catch (Exception)
-            {
-                return StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    ApiResponse<LoginResponse>.FailResponse("Something went wrong. Please try again later.")
-                );
-            }
+            return Ok(ApiResponse<LoginResponse>.SuccessResponse(result.Data!, result.Message));
         }
 
         /// <summary>
-        /// Logout from account
+        /// Đăng xuất tài khoản
         /// </summary>
         [HttpPost("logout")]
         [Authorize]
@@ -87,7 +76,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Refresh access token
+        /// Làm mới access token
         /// </summary>
         [HttpPost("refresh-token")]
         public async Task<ActionResult<ApiResponse<LoginResponse>>> RefreshToken([FromBody] RefreshTokenRequest request)
@@ -101,7 +90,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Change password
+        /// Đổi mật khẩu
         /// </summary>
         [HttpPost("change-password")]
         [Authorize]
@@ -120,7 +109,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Request password reset
+        /// Yêu cầu đặt lại mật khẩu
         /// </summary>
         [HttpPost("forgot-password")]
         public async Task<ActionResult<ApiResponse>> ForgotPassword([FromBody] ForgotPasswordRequest request)
@@ -134,7 +123,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Reset password with token
+        /// Đặt lại mật khẩu bằng token
         /// </summary>
         [HttpPost("reset-password")]
         public async Task<ActionResult<ApiResponse>> ResetPassword([FromBody] ResetPasswordRequest request)
@@ -151,7 +140,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Verify email
+        /// Xác minh email
         /// </summary>
         [HttpGet("verify-email")]
         public async Task<ActionResult<ApiResponse>> VerifyEmail([FromQuery] string token, [FromQuery] string email)
@@ -165,7 +154,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Resend verification email
+        /// Gửi lại email xác minh
         /// </summary>
         [HttpPost("resend-verification")]
         public async Task<ActionResult<ApiResponse>> ResendVerification([FromBody] ForgotPasswordRequest request)
@@ -181,7 +170,7 @@ namespace MentorEdu.Controllers.Api
         #region Google OAuth
 
         /// <summary>
-        /// Initiate Google OAuth login - redirects to Google
+        /// Khởi tạo đăng nhập qua Google OAuth - chuyển hướng đến Google
         /// </summary>
         [HttpGet("google-login")]
         public IActionResult GoogleLogin([FromQuery] string? returnUrl = null, [FromQuery] int? role = null, [FromQuery] string? mode = null)
@@ -204,7 +193,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Google OAuth callback - handles the response from Google
+        /// Callback Google OAuth - xử lý phản hồi từ Google
         /// </summary>
         [HttpGet("google-callback")]
         public async Task<IActionResult> GoogleCallback()

@@ -20,7 +20,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get notifications with pagination
+        /// Lấy thông báo có phân trang
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<PagedResponse<NotificationDto>>>> GetNotifications([FromQuery] SearchNotificationDto request)
@@ -35,7 +35,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get notification summary (unread count + recent)
+        /// Lấy tóm tắt thông báo (số chưa đọc + gần đây)
         /// </summary>
         [HttpGet("summary")]
         public async Task<ActionResult<ApiResponse<NotificationSummaryDto>>> GetSummary()
@@ -50,7 +50,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Mark notifications as read
+        /// Đánh dấu thông báo đã đọc
         /// </summary>
         [HttpPost("mark-read")]
         public async Task<ActionResult<ApiResponse>> MarkAsRead([FromBody] MarkNotificationReadDto request)
@@ -65,7 +65,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Mark all notifications as read
+        /// Đánh dấu tất cả thông báo đã đọc
         /// </summary>
         [HttpPost("mark-all-read")]
         public async Task<ActionResult<ApiResponse>> MarkAllAsRead()
@@ -80,7 +80,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a notification
+        /// Xóa một thông báo
         /// </summary>
         [HttpDelete("{notificationId}")]
         public async Task<ActionResult<ApiResponse>> DeleteNotification(long notificationId)

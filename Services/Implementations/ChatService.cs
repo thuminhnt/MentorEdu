@@ -39,7 +39,7 @@ namespace MentorEdu.Services.Implementations
                 dtos.Add(MapToConversationListDto(c, userId, unreadCount));
             }
 
-            // Sort by last message time
+            // Sắp xếp theo thời gian tin nhắn mới nhất
             dtos = dtos.OrderByDescending(d => d.LastMessageAt ?? d.CreatedAt).ToList();
 
             return ServiceResult<List<ConversationListDto>>.SuccessResult(dtos);
@@ -55,7 +55,7 @@ namespace MentorEdu.Services.Implementations
             if (participant == null)
                 return ServiceResult<ConversationDetailDto>.NotFoundResult("Participant not found");
 
-            // Determine student and mentor
+            // Xác định ai là học viên và ai là mentor
             long studentId, mentorId;
             if (user.Role == UserRole.Student)
             {
@@ -68,7 +68,7 @@ namespace MentorEdu.Services.Implementations
                 mentorId = userId;
             }
 
-            // Try to find existing conversation
+            // Tìm kiếm cuộc trò chuyện đã tồn tại
             var existingConversation = await _unitOfWork.Conversations.Query()
                 .Include(c => c.Student).ThenInclude(s => s.UserProfile)
                 .Include(c => c.Mentor).ThenInclude(m => m.UserProfile)
@@ -84,7 +84,7 @@ namespace MentorEdu.Services.Implementations
                 return ServiceResult<ConversationDetailDto>.SuccessResult(dto);
             }
 
-            // Create new conversation
+            // Tạo cuộc trò chuyện mới
             var newConversation = new Conversation
             {
                 RequestId = request.RequestId,
@@ -97,7 +97,7 @@ namespace MentorEdu.Services.Implementations
             await _unitOfWork.Conversations.AddAsync(newConversation);
             await _unitOfWork.SaveChangesAsync();
 
-            // Reload with includes
+            // Tải lại cuộc trò chuyện cùng các includes đầy đủ
             return await GetConversationByIdAsync(newConversation.Id);
         }
 
@@ -183,7 +183,7 @@ namespace MentorEdu.Services.Implementations
                 await _unitOfWork.Messages.AddAsync(message);
                 await _unitOfWork.SaveChangesAsync();
 
-                // Add files
+                // Thêm các file đính kèm vào tin nhắn
                 var files = new List<MessageFileDto>();
                 if (request.Files != null)
                 {
@@ -202,7 +202,7 @@ namespace MentorEdu.Services.Implementations
                             .Include(m => m.MessageFiles)
                             .FirstOrDefaultAsync(m => m.Id == message.Id);
                         
-                        // Add to context manually since we don't have MessageFile repository
+                        // Thêm vào context thủ công vì không có MessageFile repository
                         message.MessageFiles ??= new List<MessageFile>();
                         message.MessageFiles.Add(messageFile);
 

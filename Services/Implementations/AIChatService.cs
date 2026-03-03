@@ -23,10 +23,10 @@ namespace MentorEdu.Services.Implementations
 
         public async Task<AIChatResponseDto> SendMessageAsync(long? userId, SendAIChatMessageDto request)
         {
-            // Generate session ID if not provided
+            // Tạo session ID nếu chưa có
             var sessionId = request.SessionId ?? Guid.NewGuid().ToString();
 
-            // Save user message
+            // Lưu tin nhắn của người dùng vào database
             var userMessage = new AIChat
             {
                 UserId = userId,
@@ -37,10 +37,10 @@ namespace MentorEdu.Services.Implementations
             };
             await _chatRepository.CreateAsync(userMessage);
 
-            // Get conversation history for context (limited to 2 messages to save quota)
+            // Lấy lịch sử hội thoại để cung cấp ngữ cảnh (giới hạn 2 tin nhắn gần nhất để tiết kiệm hạn mức)
             var recentMessages = await _chatRepository.GetRecentMessagesAsync(sessionId, 2);
             var conversationHistory = recentMessages
-                .Where(m => m.Id != userMessage.Id) // Exclude current message
+                .Where(m => m.Id != userMessage.Id) // Loại bỏ tin nhắn hiện tại ra khỏi lịch sử
                 .Select(m => new ChatMessage
                 {
                     Role = m.Role,
@@ -48,7 +48,7 @@ namespace MentorEdu.Services.Implementations
                 })
                 .ToList();
 
-            // Call Gemini AI
+            // Gọi Gemini AI để sinh phản hồi
             string aiResponseText;
             try
             {
@@ -67,7 +67,7 @@ namespace MentorEdu.Services.Implementations
                 }
             }
 
-            // Save AI response
+            // Lưu phản hồi của AI vào database
             var aiMessage = new AIChat
             {
                 UserId = userId,

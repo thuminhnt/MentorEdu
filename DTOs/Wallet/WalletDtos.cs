@@ -4,7 +4,7 @@ using MentorEdu.Models.Enums;
 namespace MentorEdu.DTOs.Wallet
 {
     /// <summary>
-    /// Wallet DTO
+    /// DTO Ví tiền
     /// </summary>
     public class WalletDto
     {
@@ -17,7 +17,7 @@ namespace MentorEdu.DTOs.Wallet
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
-        // Format display
+        // Định dạng hiển thị
         public string BalanceDisplay => FormatCurrency(Balance);
         public string LockedBalanceDisplay => FormatCurrency(LockedBalance);
         public string AvailableBalanceDisplay => FormatCurrency(AvailableBalance);
@@ -29,7 +29,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Wallet with recent transactions
+    /// Ví tiền kèm giao dịch gần đây
     /// </summary>
     public class WalletDetailDto
     {
@@ -39,7 +39,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Wallet Summary
+    /// Tóm tắt ví tiền
     /// </summary>
     public class WalletSummaryDto
     {
@@ -51,7 +51,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Transaction DTO
+    /// DTO Giao dịch
     /// </summary>
     public class TransactionDto
     {
@@ -68,7 +68,7 @@ namespace MentorEdu.DTOs.Wallet
         public string? Description { get; set; }
         public DateTime? CreatedAt { get; set; }
 
-        // Order info (if any)
+        // Thông tin đơn hàng (nếu có)
         public string? OrderTitle { get; set; }
 
         private string GetTypeDisplay()
@@ -103,7 +103,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Top Up Request
+    /// Yêu cầu nạp tiền
     /// </summary>
     public class TopupRequestDto
     {
@@ -118,7 +118,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Top Up Response
+    /// Kết quả nạp tiền
     /// </summary>
     public class TopupResponseDto
     {
@@ -128,7 +128,7 @@ namespace MentorEdu.DTOs.Wallet
         public string PaymentMethod { get; set; } = string.Empty;
         public DateTime ExpireAt { get; set; }
 
-        // VietQR bank transfer fields
+        // Các trường chuyển khoản VietQR
         public string? QrCodeUrl { get; set; }
         public string? BankId { get; set; }
         public string? AccountNo { get; set; }
@@ -137,7 +137,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Withdraw Request
+    /// Yêu cầu rút tiền
     /// </summary>
     public class WithdrawRequestDto
     {
@@ -158,7 +158,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Search/Filter Transactions Request
+    /// Yêu cầu tìm kiếm/lọc giao dịch
     /// </summary>
     public class SearchTransactionDto
     {
@@ -171,7 +171,7 @@ namespace MentorEdu.DTOs.Wallet
     }
 
     /// <summary>
-    /// Payment Gateway Callback
+    /// Callback từ cổng thanh toán
     /// </summary>
     public class PaymentCallbackDto
     {

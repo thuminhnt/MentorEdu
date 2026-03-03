@@ -13,18 +13,18 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<RequestDetailDto>> UpdateRequestAsync(long requestId, long userId, UpdateRequestDto request);
         Task<ServiceResult> DeleteRequestAsync(long requestId, long userId);
         
-        // Student specific
+        // Đặc thù học viên
         Task<ServiceResult<PagedResponse<RequestListDto>>> GetMyRequestsAsync(long studentId, int pageNumber, int pageSize);
         
-        // Mentor specific
+        // Đặc thù mentor
         Task<ServiceResult<PagedResponse<RequestListDto>>> GetReceivedRequestsAsync(long mentorId, int pageNumber, int pageSize);
         Task<ServiceResult<AcceptRequestResultDto>> AcceptRequestAsync(long requestId, long mentorId);
         Task<ServiceResult> RejectRequestAsync(long requestId, long mentorId, string? reason);
         
-        // Status management
+        // Quản lý trạng thái
         Task<ServiceResult> CloseRequestAsync(long requestId, long userId);
         
-        // For mentors - browse open requests
+        // Dành cho mentor - duyệt yêu cầu đang mở
         Task<ServiceResult<PagedResponse<RequestListDto>>> GetOpenRequestsAsync(SearchRequestDto searchDto);
     }
 }

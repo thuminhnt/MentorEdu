@@ -22,7 +22,7 @@ namespace MentorEdu.Services.Implementations
             _logger = logger;
         }
 
-        public async Task<VietQRResponse> GenerateQRAsync(decimal amount, string description)
+        public Task<VietQRResponse> GenerateQRAsync(decimal amount, string description)
         {
             try
             {
@@ -37,7 +37,7 @@ namespace MentorEdu.Services.Implementations
                 _logger.LogInformation("VietQR Generated - Amount: {Amount}, Description: {Description}, URL: {Url}",
                     amount, description, qrUrl);
 
-                return new VietQRResponse
+                return Task.FromResult(new VietQRResponse
                 {
                     QrDataUrl = qrUrl,
                     BankId = _settings.BankId,
@@ -47,16 +47,16 @@ namespace MentorEdu.Services.Implementations
                     Description = description,
                     Success = true,
                     Message = "QR code generated successfully"
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "VietQR generation failed");
-                return new VietQRResponse
+                return Task.FromResult(new VietQRResponse
                 {
                     Success = false,
                     Message = $"Failed to generate QR: {ex.Message}"
-                };
+                });
             }
         }
     }

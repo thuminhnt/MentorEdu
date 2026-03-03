@@ -11,20 +11,20 @@ namespace MentorEdu.Controllers.Api
     [Route("api/[controller]")]
     public class CategoryController : ControllerBase
     {
-        private readonly IAdminService _adminService;
+        private readonly IAdminCategoryService _categoryService;
 
-        public CategoryController(IAdminService adminService)
+        public CategoryController(IAdminCategoryService categoryService)
         {
-            _adminService = adminService;
+            _categoryService = categoryService;
         }
 
         /// <summary>
-        /// Get all categories (public)
+        /// Lấy tất cả danh mục (công khai)
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<CategoryResponseDto>>>> GetCategories()
         {
-            var result = await _adminService.GetCategoriesAsync();
+            var result = await _categoryService.GetCategoriesAsync();
 
             if (!result.Success)
                 return StatusCode(result.StatusCode, ApiResponse<List<CategoryResponseDto>>.FailResponse(result.Message ?? ""));
@@ -33,12 +33,12 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get category by ID (public)
+        /// Lấy danh mục theo ID (công khai)
         /// </summary>
         [HttpGet("{categoryId}")]
         public async Task<ActionResult<ApiResponse<CategoryResponseDto>>> GetCategoryById(long categoryId)
         {
-            var result = await _adminService.GetCategoryByIdAsync(categoryId);
+            var result = await _categoryService.GetCategoryByIdAsync(categoryId);
 
             if (!result.Success)
                 return StatusCode(result.StatusCode, ApiResponse<CategoryResponseDto>.FailResponse(result.Message ?? ""));
@@ -47,12 +47,12 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get hashtags by category ID (public)
+        /// Lấy hashtag theo ID danh mục (công khai)
         /// </summary>
         [HttpGet("{categoryId}/hashtags")]
         public async Task<ActionResult<ApiResponse<CategoryHashtagDetailDto>>> GetHashtagsByCategory(long categoryId)
         {
-            var result = await _adminService.GetHashtagsByCategoryAsync(categoryId);
+            var result = await _categoryService.GetHashtagsByCategoryAsync(categoryId);
 
             if (!result.Success)
                 return StatusCode(result.StatusCode, ApiResponse<CategoryHashtagDetailDto>.FailResponse(result.Message ?? ""));
@@ -61,19 +61,18 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Search hashtags (public) - for autocomplete
+        /// Tìm kiếm hashtag (công khai) - dùng cho gợi ý tự động
         /// </summary>
         [HttpGet("/api/hashtags")]
         public async Task<ActionResult<ApiResponse<List<HashtagDto>>>> SearchHashtags([FromQuery] string? keyword = null)
         {
-            var result = await _adminService.GetHashtagsAsync();
+            var result = await _categoryService.GetHashtagsAsync();
 
             if (!result.Success)
                 return StatusCode(result.StatusCode, ApiResponse<List<HashtagDto>>.FailResponse(result.Message ?? ""));
 
             var hashtags = result.Data ?? new List<HashtagDto>();
-            
-            // Filter by keyword if provided
+
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 hashtags = hashtags

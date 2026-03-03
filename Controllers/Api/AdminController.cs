@@ -26,7 +26,7 @@ namespace MentorEdu.Controllers.Api
         #region Dashboard
 
         /// <summary>
-        /// Get admin dashboard data
+        /// Lấy dữ liệu bảng điều khiển tổng quan cho admin
         /// </summary>
         [HttpGet("dashboard")]
         public async Task<ActionResult<ApiResponse<AdminDashboardDto>>> GetDashboard()
@@ -44,7 +44,7 @@ namespace MentorEdu.Controllers.Api
         #region User Management
 
         /// <summary>
-        /// Get all users with filters
+        /// Lấy danh sách người dùng với các bộ lọc
         /// </summary>
         [HttpGet("users")]
         public async Task<ActionResult<ApiResponse<PagedResponse<UserBasicDto>>>> GetUsers(
@@ -63,7 +63,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get user detail by ID
+        /// Lấy thông tin chi tiết người dùng theo ID
         /// </summary>
         [HttpGet("users/{userId}")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> GetUserDetail(long userId)
@@ -77,7 +77,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create new user (admin only)
+        /// Tạo người dùng mới (chỉ admin)
         /// </summary>
         [HttpPost("users")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> CreateUser([FromBody] AdminCreateUserDto request)
@@ -94,7 +94,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update user (admin only)
+        /// Cập nhật thông tin người dùng (chỉ admin)
         /// </summary>
         [HttpPut("users/{userId}")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> UpdateUser(long userId, [FromBody] AdminUpdateUserDto request)
@@ -111,7 +111,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete user (admin only)
+        /// Xóa người dùng (chỉ admin)
         /// </summary>
         [HttpDelete("users/{userId}")]
         public async Task<ActionResult<ApiResponse>> DeleteUser(long userId)
@@ -125,7 +125,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Activate user account
+        /// Kích hoạt tài khoản người dùng
         /// </summary>
         [HttpPost("users/{userId}/activate")]
         public async Task<ActionResult<ApiResponse>> ActivateUser(long userId)
@@ -139,7 +139,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Deactivate user account
+        /// Vô hiệu hóa tài khoản người dùng
         /// </summary>
         [HttpPost("users/{userId}/deactivate")]
         public async Task<ActionResult<ApiResponse>> DeactivateUser(long userId)
@@ -153,7 +153,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Ban user account
+        /// Cấm tài khoản người dùng
         /// </summary>
         [HttpPost("users/{userId}/ban")]
         public async Task<ActionResult<ApiResponse>> BanUser(long userId, [FromBody] BanUserRequest request)
@@ -167,7 +167,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Verify user account
+        /// Xác minh tài khoản người dùng
         /// </summary>
         [HttpPost("users/{userId}/verify")]
         public async Task<ActionResult<ApiResponse>> VerifyUser(long userId)
@@ -185,7 +185,7 @@ namespace MentorEdu.Controllers.Api
         #region Category Management
 
         /// <summary>
-        /// Get all categories
+        /// Lấy danh sách tất cả danh mục
         /// </summary>
         [HttpGet("categories")]
         [AllowAnonymous]
@@ -200,7 +200,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get category by ID
+        /// Lấy danh mục theo ID
         /// </summary>
         [HttpGet("categories/{categoryId}")]
         [AllowAnonymous]
@@ -215,7 +215,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a new category
+        /// Tạo danh mục mới
         /// </summary>
         [HttpPost("categories")]
         public async Task<ActionResult<ApiResponse<CategoryResponseDto>>> CreateCategory([FromBody] CreateCategoryRequest request)
@@ -232,7 +232,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update a category
+        /// Cập nhật danh mục
         /// </summary>
         [HttpPut("categories/{categoryId}")]
         public async Task<ActionResult<ApiResponse<CategoryResponseDto>>> UpdateCategory(long categoryId, [FromBody] UpdateCategoryRequest request)
@@ -249,7 +249,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a category
+        /// Xóa danh mục
         /// </summary>
         [HttpDelete("categories/{categoryId}")]
         public async Task<ActionResult<ApiResponse>> DeleteCategory(long categoryId)
@@ -267,7 +267,7 @@ namespace MentorEdu.Controllers.Api
         #region Category-Hashtag Mapping
 
         /// <summary>
-        /// Get all category-hashtag mappings
+        /// Lấy tất cả ánh xạ danh mục - hashtag
         /// </summary>
         [HttpGet("category-hashtags")]
         [AllowAnonymous]
@@ -282,7 +282,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get hashtags mapped to a specific category
+        /// Lấy các hashtag thuộc một danh mục cụ thể
         /// </summary>
         [HttpGet("categories/{categoryId}/hashtags")]
         public async Task<ActionResult<ApiResponse<CategoryHashtagDetailDto>>> GetHashtagsByCategory(long categoryId)
@@ -296,7 +296,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Add hashtag mapping to a category
+        /// Thêm hashtag vào danh mục
         /// </summary>
         [HttpPost("category-hashtags")]
         public async Task<ActionResult<ApiResponse>> AddCategoryHashtagMapping([FromBody] AddCategoryHashtagDto request)
@@ -313,7 +313,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Remove hashtag mapping from a category
+        /// Xóa hashtag khỏi danh mục
         /// </summary>
         [HttpDelete("category-hashtags")]
         public async Task<ActionResult<ApiResponse>> RemoveCategoryHashtagMapping([FromBody] RemoveCategoryHashtagDto request)
@@ -334,7 +334,7 @@ namespace MentorEdu.Controllers.Api
         #region Report Management
 
         /// <summary>
-        /// Get all reports with filters
+        /// Lấy danh sách báo cáo vi phạm với bộ lọc
         /// </summary>
         [HttpGet("reports")]
         public async Task<ActionResult<ApiResponse<PagedResponse<ReportDto>>>> GetReports(
@@ -351,7 +351,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get report detail by ID
+        /// Lấy chi tiết báo cáo theo ID
         /// </summary>
         [HttpGet("reports/{reportId}")]
         public async Task<ActionResult<ApiResponse<ReportDetailDto>>> GetReportDetail(long reportId)
@@ -365,7 +365,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Handle a report
+        /// Xử lý báo cáo vi phạm
         /// </summary>
         [HttpPost("reports/{reportId}/handle")]
         public async Task<ActionResult<ApiResponse>> HandleReport(long reportId, [FromBody] HandleReportRequest request)
@@ -392,7 +392,7 @@ namespace MentorEdu.Controllers.Api
         #region Requests Management
 
         /// <summary>
-        /// Get all requests with filters
+        /// Lấy danh sách yêu cầu tìm mentor với bộ lọc
         /// </summary>
         [HttpGet("requests")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminRequestListDto>>>> GetAllRequests([FromQuery] AdminSearchRequestDto request)
@@ -406,7 +406,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a request (admin only)
+        /// Xóa yêu cầu tìm mentor (chỉ admin)
         /// </summary>
         [HttpDelete("requests/{requestId}")]
         public async Task<ActionResult<ApiResponse>> DeleteRequest(long requestId, [FromQuery] string reason = "Violated policies")
@@ -424,7 +424,7 @@ namespace MentorEdu.Controllers.Api
         #region Proposals Management
 
         /// <summary>
-        /// Get all proposals with filters
+        /// Lấy danh sách đề xuất với bộ lọc
         /// </summary>
         [HttpGet("proposals")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminProposalListDto>>>> GetAllProposals([FromQuery] AdminSearchProposalDto request)
@@ -438,7 +438,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a proposal (admin only)
+        /// Xóa đề xuất (chỉ admin)
         /// </summary>
         [HttpDelete("proposals/{proposalId}")]
         public async Task<ActionResult<ApiResponse>> DeleteProposal(long proposalId, [FromQuery] string reason = "Violated policies")
@@ -456,7 +456,7 @@ namespace MentorEdu.Controllers.Api
         #region Orders Management
 
         /// <summary>
-        /// Get all orders with filters
+        /// Lấy danh sách đơn hàng với bộ lọc
         /// </summary>
         [HttpGet("orders")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminOrderListDto>>>> GetAllOrders([FromQuery] AdminSearchOrderDto request)
@@ -470,7 +470,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get order detail for admin
+        /// Lấy chi tiết đơn hàng (admin)
         /// </summary>
         [HttpGet("orders/{orderId}")]
         public async Task<ActionResult<ApiResponse<AdminOrderListDto>>> GetOrderDetail(long orderId)
@@ -484,7 +484,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update order status (admin intervention)
+        /// Cập nhật trạng thái đơn hàng (admin can thiệp)
         /// </summary>
         [HttpPut("orders/{orderId}/status")]
         public async Task<ActionResult<ApiResponse>> UpdateOrderStatus(long orderId, [FromBody] AdminUpdateOrderStatusDto request)
@@ -502,7 +502,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Refund an order (admin only)
+        /// Hoàn tiền cho đơn hàng (chỉ admin)
         /// </summary>
         [HttpPost("orders/{orderId}/refund")]
         public async Task<ActionResult<ApiResponse>> RefundOrder(long orderId, [FromBody] AdminRefundOrderDto request)
@@ -524,7 +524,7 @@ namespace MentorEdu.Controllers.Api
         #region Community Posts Management
 
         /// <summary>
-        /// Get all community posts with filters
+        /// Lấy danh sách bài viết cộng đồng với bộ lọc
         /// </summary>
         [HttpGet("posts")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminPostListDto>>>> GetAllPosts([FromQuery] AdminSearchPostDto request)
@@ -538,7 +538,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a post (admin only)
+        /// Xóa bài viết (chỉ admin)
         /// </summary>
         [HttpDelete("posts/{postId}")]
         public async Task<ActionResult<ApiResponse>> DeletePost(long postId, [FromQuery] string reason = "Violated policies")
@@ -552,7 +552,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Hide a post (admin only)
+        /// Ẩn bài viết (chỉ admin)
         /// </summary>
         [HttpPost("posts/{postId}/hide")]
         public async Task<ActionResult<ApiResponse>> HidePost(long postId, [FromBody] HideContentRequest? request = null)
@@ -566,7 +566,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Unhide a post (admin only - revert mistaken hide)
+        /// Bỏ ẩn bài viết (chỉ admin — hủy thao tác ẩn nhầm)
         /// </summary>
         [HttpPost("posts/{postId}/unhide")]
         public async Task<ActionResult<ApiResponse>> UnhidePost(long postId)
@@ -584,7 +584,7 @@ namespace MentorEdu.Controllers.Api
         #region Community Comments Management
 
         /// <summary>
-        /// Get all comments with filters
+        /// Lấy danh sách bình luận với bộ lọc
         /// </summary>
         [HttpGet("comments")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminCommentListDto>>>> GetAllComments([FromQuery] AdminSearchCommentDto request)
@@ -598,7 +598,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a comment (admin only)
+        /// Xóa bình luận (chỉ admin)
         /// </summary>
         [HttpDelete("comments/{commentId}")]
         public async Task<ActionResult<ApiResponse>> DeleteComment(long commentId, [FromQuery] string reason = "Violated policies")
@@ -616,7 +616,7 @@ namespace MentorEdu.Controllers.Api
         #region Transactions Management
 
         /// <summary>
-        /// Get all transactions with filters
+        /// Lấy danh sách giao dịch với bộ lọc
         /// </summary>
         [HttpGet("transactions")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminTransactionListDto>>>> GetAllTransactions([FromQuery] AdminSearchTransactionDto request)
@@ -630,7 +630,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Verify a transaction (approve or reject pending transactions)
+        /// Xác thực giao dịch (duyệt hoặc từ chối giao dịch đang chờ)
         /// </summary>
         [HttpPost("transactions/{transactionId}/verify")]
         public async Task<ActionResult<ApiResponse>> VerifyTransaction(long transactionId, [FromBody] VerifyTransactionRequest request)
@@ -649,7 +649,7 @@ namespace MentorEdu.Controllers.Api
         #region Wallets Management
 
         /// <summary>
-        /// Get all wallets with filters
+        /// Lấy danh sách ví điện tử với bộ lọc
         /// </summary>
         [HttpGet("wallets")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminWalletListDto>>>> GetAllWallets([FromQuery] AdminSearchWalletDto request)
@@ -663,7 +663,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get wallet detail for admin
+        /// Lấy chi tiết ví điện tử (admin)
         /// </summary>
         [HttpGet("wallets/{walletId}")]
         public async Task<ActionResult<ApiResponse<AdminWalletListDto>>> GetWalletDetail(long walletId)
@@ -681,7 +681,7 @@ namespace MentorEdu.Controllers.Api
         #region Reviews Management
 
         /// <summary>
-        /// Get all reviews with filters
+        /// Lấy danh sách đánh giá với bộ lọc
         /// </summary>
         [HttpGet("reviews")]
         public async Task<ActionResult<ApiResponse<PagedResponse<AdminReviewListDto>>>> GetAllReviews([FromQuery] AdminSearchReviewDto request)
@@ -695,7 +695,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a review (admin only)
+        /// Xóa đánh giá (chỉ admin)
         /// </summary>
         [HttpDelete("reviews/{reviewId}")]
         public async Task<ActionResult<ApiResponse>> DeleteReview(long reviewId, [FromQuery] string reason = "Inappropriate content")
@@ -713,7 +713,7 @@ namespace MentorEdu.Controllers.Api
         #region Hashtags Management
 
         /// <summary>
-        /// Get all hashtags with filters
+        /// Lấy danh sách hashtag với bộ lọc
         /// </summary>
         [HttpGet("hashtags")]
         [AllowAnonymous]
@@ -728,7 +728,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a new hashtag
+        /// Tạo hashtag mới
         /// </summary>
         [HttpPost("hashtags")]
         public async Task<ActionResult<ApiResponse<AdminHashtagDto>>> CreateHashtag([FromBody] CreateHashtagDto request)
@@ -745,7 +745,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete a hashtag
+        /// Xóa hashtag
         /// </summary>
         [HttpDelete("hashtags/{hashtagId}")]
         public async Task<ActionResult<ApiResponse>> DeleteHashtag(long hashtagId)
@@ -763,7 +763,7 @@ namespace MentorEdu.Controllers.Api
         #region Mentor Applications Management
 
         /// <summary>
-        /// Get all mentor applications with filters
+        /// Lấy danh sách đơn đăng ký mentor với bộ lọc
         /// </summary>
         [HttpGet("mentor-applications")]
         public async Task<ActionResult<ApiResponse<PagedResponse<MentorApplicationDto>>>> GetMentorApplications(
@@ -780,7 +780,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get mentor application detail by user ID
+        /// Lấy chi tiết đơn đăng ký mentor theo user ID
         /// </summary>
         [HttpGet("mentor-applications/{userId}")]
         public async Task<ActionResult<ApiResponse<MentorApplicationDto>>> GetMentorApplicationDetail(long userId)
@@ -794,7 +794,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Approve a mentor application - changes user role to Mentor
+        /// Duyệt đơn đăng ký mentor — chuyển vai trò người dùng thành Mentor
         /// </summary>
         [HttpPost("mentor-applications/{userId}/approve")]
         public async Task<ActionResult<ApiResponse>> ApproveMentorApplication(long userId)
@@ -809,7 +809,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Reject a mentor application
+        /// Từ chối đơn đăng ký mentor
         /// </summary>
         [HttpPost("mentor-applications/{userId}/reject")]
         public async Task<ActionResult<ApiResponse>> RejectMentorApplication(long userId, [FromBody] RejectMentorRequest request)
@@ -827,8 +827,8 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Re-evaluate a pending mentor application using AI
-        /// Triggers a new AI analysis on the existing application data
+        /// Đánh giá lại đơn đăng ký mentor bằng AI
+        /// Kích hoạt phân tích AI mới trên dữ liệu đơn hiện tại
         /// </summary>
         [HttpPost("mentor-applications/{userId}/re-evaluate")]
         public async Task<ActionResult<ApiResponse<MentorApplicationDto>>> ReEvaluateMentorApplication(long userId)
@@ -847,7 +847,7 @@ namespace MentorEdu.Controllers.Api
         #region Mentor Application History
 
         /// <summary>
-        /// Get application history with filters (for audit trail)
+        /// Lấy lịch sử xét duyệt với bộ lọc (dùng để kiểm toán)
         /// </summary>
         [HttpGet("mentor-applications/history")]
         public async Task<ActionResult<ApiResponse<PagedResponse<MentorApplicationHistoryDto>>>> GetApplicationHistory(
@@ -877,7 +877,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get application history for a specific user
+        /// Lấy lịch sử xét duyệt của một người dùng cụ thể
         /// </summary>
         [HttpGet("mentor-applications/{userId}/history")]
         public async Task<ActionResult<ApiResponse<List<MentorApplicationHistoryDto>>>> GetUserApplicationHistory(long userId)
@@ -891,7 +891,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Export application history for ML training (JSON format)
+        /// Xuất lịch sử xét duyệt để huấn luyện ML (dạng JSON)
         /// </summary>
         [HttpGet("mentor-applications/history/export")]
         public async Task<ActionResult<ApiResponse<List<MentorApplicationHistoryExportDto>>>> ExportApplicationHistoryForML(
