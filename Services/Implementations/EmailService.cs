@@ -100,7 +100,7 @@ namespace MentorEdu.Services.Implementations
                 </div>
             </div>
             <div class=""footer"">
-                <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>
+                <p class=""footer-text"">© {DateTime.UtcNow.Year} EduMentor. All rights reserved.</p>
             </div>
         </div>
     </div>
@@ -166,7 +166,7 @@ namespace MentorEdu.Services.Implementations
                 </div>
             </div>
             <div class=""footer"">
-                <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>
+                <p class=""footer-text"">© {DateTime.UtcNow.Year} EduMentor. All rights reserved.</p>
             </div>
         </div>
     </div>
@@ -234,7 +234,7 @@ namespace MentorEdu.Services.Implementations
                 </ul>
             </div>
             <div class=""footer"">
-                <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>
+                <p class=""footer-text"">© {DateTime.UtcNow.Year} EduMentor. All rights reserved.</p>
             </div>
         </div>
     </div>
@@ -292,7 +292,7 @@ namespace MentorEdu.Services.Implementations
                 <p class=""text"">Best regards,<br>The EduMentor Team</p>
             </div>
             <div class=""footer"">
-                <p class=""footer-text"">© 2026 EduMentor. All rights reserved.</p>
+                <p class=""footer-text"">© {DateTime.UtcNow.Year} EduMentor. All rights reserved.</p>
             </div>
         </div>
     </div>

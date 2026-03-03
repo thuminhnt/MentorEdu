@@ -9,403 +9,344 @@ using MentorEdu.Services.Interfaces;
 
 namespace MentorEdu.Services.Implementations
 {
-    public class GroupService : IGroupService
+    public class GroupService : BaseService, IGroupService
     {
         private readonly IGroupRepository _groupRepository;
         private readonly IGroupMemberRepository _groupMemberRepository;
         private readonly IGroupMessageRepository _groupMessageRepository;
         private readonly IUserRepository _userRepository;
-        private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger<GroupService> _logger;
 
         public GroupService(
             IGroupRepository groupRepository,
             IGroupMemberRepository groupMemberRepository,
             IGroupMessageRepository groupMessageRepository,
             IUserRepository userRepository,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ILogger<GroupService> logger) : base(unitOfWork)
         {
             _groupRepository = groupRepository;
             _groupMemberRepository = groupMemberRepository;
             _groupMessageRepository = groupMessageRepository;
             _userRepository = userRepository;
-            _unitOfWork = unitOfWork;
+            _logger = logger;
         }
 
         public async Task<ServiceResult<GroupDto>> CreateGroupAsync(long mentorId, CreateGroupDto dto)
         {
-            try
+            // Kiểm tra mentor có tồn tại không
+            var mentor = await _userRepository.GetByIdWithProfilesAsync(mentorId);
+            if (mentor == null)
+                return ServiceResult<GroupDto>.NotFoundResult("Mentor not found");
+
+            // Tạo mã mời tham gia độc nhất
+            var inviteCode = await GenerateUniqueInviteCodeAsync();
+
+            var group = new Group
             {
-                Console.WriteLine($"[GroupService] Creating group for mentorId: {mentorId}, Name: {dto.Name}");
-                
-                // Verify mentor exists
-                var mentor = await _userRepository.GetByIdWithProfilesAsync(mentorId);
-                if (mentor == null)
-                {
-                    Console.WriteLine($"[GroupService] ERROR: Mentor not found with ID: {mentorId}");
-                    return ServiceResult<GroupDto>.Failure("Mentor not found");
-                }
-                
-              
+                Name = dto.Name,
+                Description = dto.Description,
+                MentorId = mentorId,
+                InviteCode = inviteCode,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
 
-                // Generate unique invite code
-                var inviteCode = await GenerateUniqueInviteCodeAsync();
-                Console.WriteLine($"[GroupService] Generated invite code: {inviteCode}");
-
-                var group = new Group
-                {
-                    Name = dto.Name,
-                    Description = dto.Description,
-                    MentorId = mentorId,
-                    InviteCode = inviteCode,
-                    CreatedAt = DateTime.UtcNow,
-                    IsActive = true
-                };
-
-                // Add mentor as admin member directly to collection
-                // EF Core will handle the FK (GroupId) automatically
-                var mentorMember = new GroupMember
-                {
-                    // GroupId NOT set here, handled by navigation
-                    UserId = mentorId,
-                    Role = GroupRole.Admin,
-                    JoinedAt = DateTime.UtcNow
-                };
-                group.Members.Add(mentorMember);
-
-                await _groupRepository.AddAsync(group);
-                // await _groupMemberRepository.AddAsync(mentorMember); // REMOVED: Managed by navigation
-                Console.WriteLine($"[GroupService] Saving group to database...");
-                await _unitOfWork.SaveChangesAsync();
-                Console.WriteLine($"[GroupService] Group saved successfully with ID: {group.Id}");
-
-                // Manually attach properties to avoid reloading from DB
-                // This ensures we have the necessary navigation properties for mapping
-                group.Mentor = mentor;
-                // Note: mentorMember.User setter might be needed if not virtual, but assuming EF Core POCO
-                mentorMember.User = mentor;
-                group.Members = new List<GroupMember> { mentorMember };
-
-                Console.WriteLine($"[GroupService] Mapping group to DTO...");
-                GroupDto groupDto;
-                try
-                {
-                    groupDto = await MapToGroupDtoAsync(group, mentorId);
-                    Console.WriteLine($"[GroupService] Mapping successful");
-                }
-                catch (Exception mapEx)
-                {
-                    Console.WriteLine($"[GroupService] MAPPING ERROR: {mapEx.Message}");
-                    Console.WriteLine($"[GroupService] StackTrace: {mapEx.StackTrace}");
-                    throw; // Re-throw to outer catch
-                }
-                
-                Console.WriteLine($"[GroupService] Group created successfully: ID={groupDto.Id}, Name={groupDto.Name}");
-                return ServiceResult<GroupDto>.SuccessResult(groupDto);
-            }
-            catch (Exception ex)
+            // Thêm mentor vào nhóm làm admin qua navigation property — EF Core tự động xử lý FK (GroupId)
+            var mentorMember = new GroupMember
             {
-                Console.WriteLine($"[GroupService] EXCEPTION: {ex.GetType().Name}");
-                Console.WriteLine($"[GroupService] Message: {ex.Message}");
-                Console.WriteLine($"[GroupService] StackTrace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"[GroupService] InnerException: {ex.InnerException.Message}");
-                }
-                return ServiceResult<GroupDto>.Failure($"Error creating group: {ex.Message}");
-            }
+                UserId = mentorId,
+                Role = GroupRole.Admin,
+                JoinedAt = DateTime.UtcNow
+            };
+            group.Members.Add(mentorMember);
+
+            await _groupRepository.AddAsync(group);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Gắn các navigation property để tránh trập vào DB thêm lần nữa
+            group.Mentor = mentor;
+            mentorMember.User = mentor;
+            group.Members = new List<GroupMember> { mentorMember };
+
+            var groupDto = await MapToGroupDtoAsync(group, mentorId);
+            return ServiceResult<GroupDto>.SuccessResult(groupDto);
         }
 
         public async Task<ServiceResult<GroupDto>> JoinGroupAsync(long userId, string inviteCode)
         {
-            try
+            var group = await _groupRepository.GetByInviteCodeAsync(inviteCode);
+            if (group == null)
+                return ServiceResult<GroupDto>.FailResult("Invalid invite code");
+
+            // Kiểm tra đã là thành viên chưa
+            var existingMember = await _groupMemberRepository.GetMemberAsync(group.Id, userId);
+            if (existingMember != null)
+                return ServiceResult<GroupDto>.FailResult("You are already a member of this group");
+
+            // Lấy thông tin người dùng cho tin nhắn hệ thống (gia nhập)
+            var user = await _userRepository.GetByIdWithProfilesAsync(userId);
+            var userName = user?.UserProfile?.FullName ?? user?.Email ?? "Someone";
+
+            var member = new GroupMember
             {
-                var group = await _groupRepository.GetByInviteCodeAsync(inviteCode);
-                if (group == null)
-                {
-                    return ServiceResult<GroupDto>.Failure("Invalid invite code");
-                }
+                GroupId = group.Id,
+                UserId = userId,
+                Role = GroupRole.Member,
+                JoinedAt = DateTime.UtcNow
+            };
 
-                // Check if already a member
-                var existingMember = await _groupMemberRepository.GetMemberAsync(group.Id, userId);
-                if (existingMember != null)
-                {
-                    return ServiceResult<GroupDto>.Failure("You are already a member of this group");
-                }
+            await _groupMemberRepository.AddAsync(member);
 
-                // Get user info for system message
-                var user = await _userRepository.GetByIdWithProfilesAsync(userId);
-                var userName = user?.UserProfile?.FullName ?? user?.Email ?? "Someone";
-
-                var member = new GroupMember
-                {
-                    GroupId = group.Id,
-                    UserId = userId,
-                    Role = GroupRole.Member,
-                    JoinedAt = DateTime.UtcNow
-                };
-
-                await _groupMemberRepository.AddAsync(member);
-                
-                // Create system message for member joined
-                var systemMessage = new GroupMessage
-                {
-                    GroupId = group.Id,
-                    SenderId = userId,
-                    Content = $"{userName} joined the group",
-                    MessageType = MessageType.System,
-                    CreatedAt = DateTime.UtcNow
-                };
-                await _groupMessageRepository.AddAsync(systemMessage);
-                
-                await _unitOfWork.SaveChangesAsync();
-
-                // Reload group with updated members
-                var updatedGroup = await _groupRepository.GetByIdAsync(group.Id);
-                if (updatedGroup == null)
-                {
-                    return ServiceResult<GroupDto>.Failure("Failed to retrieve group");
-                }
-
-                var groupDto = await MapToGroupDtoAsync(updatedGroup, userId);
-                return ServiceResult<GroupDto>.SuccessResult(groupDto);
-            }
-            catch (Exception ex)
+            // Tạo tin nhắn hệ thống khi có thành viên mới gia nhập
+            var systemMessage = new GroupMessage
             {
-                return ServiceResult<GroupDto>.Failure($"Error joining group: {ex.Message}");
-            }
+                GroupId = group.Id,
+                SenderId = userId,
+                Content = $"{userName} joined the group",
+                MessageType = MessageType.System,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _groupMessageRepository.AddAsync(systemMessage);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // Tải lại nhóm sau khi cập nhật danh sách thành viên (JoinGroup)
+            var updatedGroup = await _groupRepository.GetByIdAsync(group.Id);
+            if (updatedGroup == null)
+                return ServiceResult<GroupDto>.FailResult("Failed to retrieve group");
+
+            var groupDto = await MapToGroupDtoAsync(updatedGroup, userId);
+            return ServiceResult<GroupDto>.SuccessResult(groupDto);
         }
 
         public async Task<ServiceResult<GroupDto>> AddMemberAsync(long adminId, long groupId, long userId)
         {
-            try
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+                return ServiceResult<GroupDto>.NotFoundResult("Group not found");
+
+            // Kiểm tra admin có quyền thực hiện không
+            var adminMember = await _groupMemberRepository.GetMemberAsync(groupId, adminId);
+            if (adminMember == null || adminMember.Role != GroupRole.Admin)
+                return ServiceResult<GroupDto>.FailResult("Only group admin can add members");
+
+            // Kiểm tra người dùng đã là thành viên chưa (AddMember)
+            var existingMember = await _groupMemberRepository.GetMemberAsync(groupId, userId);
+            if (existingMember != null)
+                return ServiceResult<GroupDto>.FailResult("User is already a member of this group");
+
+            // Lấy thông tin người dùng cho tin nhắn hệ thống (thêm thành viên)
+            var user = await _userRepository.GetByIdWithProfilesAsync(userId);
+            if (user == null)
+                return ServiceResult<GroupDto>.NotFoundResult("User not found");
+
+            var userName = user.UserProfile?.FullName ?? user.Email ?? "Someone";
+
+            // Thêm thành viên mới vào nhóm
+            var member = new GroupMember
             {
-                var group = await _groupRepository.GetByIdAsync(groupId);
-                if (group == null)
-                {
-                    return ServiceResult<GroupDto>.Failure("Group not found");
-                }
+                GroupId = groupId,
+                UserId = userId,
+                Role = GroupRole.Member,
+                JoinedAt = DateTime.UtcNow
+            };
+            await _groupMemberRepository.AddAsync(member);
 
-                // Check if admin has permission
-                var adminMember = await _groupMemberRepository.GetMemberAsync(groupId, adminId);
-                if (adminMember == null || adminMember.Role != GroupRole.Admin)
-                {
-                    return ServiceResult<GroupDto>.Failure("Only group admin can add members");
-                }
-
-                // Check if user is already a member
-                var existingMember = await _groupMemberRepository.GetMemberAsync(groupId, userId);
-                if (existingMember != null)
-                {
-                    return ServiceResult<GroupDto>.Failure("User is already a member of this group");
-                }
-
-                // Get user info for system message
-                var user = await _userRepository.GetByIdWithProfilesAsync(userId);
-                if (user == null)
-                {
-                    return ServiceResult<GroupDto>.Failure("User not found");
-                }
-                var userName = user.UserProfile?.FullName ?? user.Email ?? "Someone";
-
-                // Add new member
-                var member = new GroupMember
-                {
-                    GroupId = groupId,
-                    UserId = userId,
-                    Role = GroupRole.Member,
-                    JoinedAt = DateTime.UtcNow
-                };
-                await _groupMemberRepository.AddAsync(member);
-
-                // Create system message for member added
-                var systemMessage = new GroupMessage
-                {
-                    GroupId = groupId,
-                    SenderId = adminId,
-                    Content = $"{userName} was added to the group",
-                    MessageType = MessageType.System,
-                    CreatedAt = DateTime.UtcNow
-                };
-                await _groupMessageRepository.AddAsync(systemMessage);
-
-                await _unitOfWork.SaveChangesAsync();
-
-                // Reload group with updated members
-                var updatedGroup = await _groupRepository.GetByIdAsync(groupId);
-                if (updatedGroup == null)
-                {
-                    return ServiceResult<GroupDto>.Failure("Failed to retrieve group");
-                }
-
-                var groupDto = await MapToGroupDtoAsync(updatedGroup, adminId);
-                return ServiceResult<GroupDto>.SuccessResult(groupDto);
-            }
-            catch (Exception ex)
+            // Tạo tin nhắn hệ thống khi admin thêm thành viên
+            var systemMessage = new GroupMessage
             {
-                return ServiceResult<GroupDto>.Failure($"Error adding member: {ex.Message}");
-            }
+                GroupId = groupId,
+                SenderId = adminId,
+                Content = $"{userName} was added to the group",
+                MessageType = MessageType.System,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _groupMessageRepository.AddAsync(systemMessage);
+
+            // Notify the added user
+            var adminUser = await _userRepository.GetByIdWithProfilesAsync(adminId);
+            var adminName = adminUser?.UserProfile?.FullName ?? adminUser?.Email ?? "The group admin";
+            var notification = new Notification
+            {
+                UserId = userId,
+                Type = NotificationType.System,
+                Title = "You've been added to a group",
+                Body = $"{adminName} has added you to the group \"{group.Name}\".",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.Notifications.AddAsync(notification);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            // Tải lại nhóm sau khi cập nhật (AddMember)
+            var updatedGroup = await _groupRepository.GetByIdAsync(groupId);
+            if (updatedGroup == null)
+                return ServiceResult<GroupDto>.FailResult("Failed to retrieve group");
+
+            var groupDto = await MapToGroupDtoAsync(updatedGroup, adminId);
+            return ServiceResult<GroupDto>.SuccessResult(groupDto);
+        }
+
+        public async Task<ServiceResult<bool>> RemoveMemberAsync(long adminId, long groupId, long userId)
+        {
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+                return ServiceResult<bool>.NotFoundResult("Group not found");
+
+            // Only admin can kick members
+            var adminMember = await _groupMemberRepository.GetMemberAsync(groupId, adminId);
+            if (adminMember == null || adminMember.Role != GroupRole.Admin)
+                return ServiceResult<bool>.FailResult("Only the group admin can remove members");
+
+            // Cannot kick yourself (admin)
+            if (adminId == userId)
+                return ServiceResult<bool>.FailResult("Admin cannot remove themselves from the group");
+
+            var targetMember = await _groupMemberRepository.GetMemberAsync(groupId, userId);
+            if (targetMember == null)
+                return ServiceResult<bool>.FailResult("User is not a member of this group");
+
+            var targetUser = await _userRepository.GetByIdWithProfilesAsync(userId);
+            var userName = targetUser?.UserProfile?.FullName ?? targetUser?.Email ?? "A member";
+
+            // System message
+            var systemMessage = new GroupMessage
+            {
+                GroupId = groupId,
+                SenderId = adminId,
+                Content = $"{userName} was removed from the group",
+                MessageType = MessageType.System,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _groupMessageRepository.AddAsync(systemMessage);
+
+            await _groupMemberRepository.DeleteAsync(targetMember);
+
+            // Notify the removed user
+            var adminUser = await _userRepository.GetByIdWithProfilesAsync(adminId);
+            var adminName = adminUser?.UserProfile?.FullName ?? adminUser?.Email ?? "The group admin";
+            var notification = new Notification
+            {
+                UserId = userId,
+                Type = NotificationType.System,
+                Title = "You were removed from a group",
+                Body = $"{adminName} has removed you from the group \"{group.Name}\".",
+                IsRead = false,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.Notifications.AddAsync(notification);
+
+            await _unitOfWork.SaveChangesAsync();
+            return ServiceResult<bool>.SuccessResult(true);
         }
 
         public async Task<ServiceResult<GroupDto>> GetGroupByIdAsync(long groupId)
         {
-            try
-            {
-                var group = await _groupRepository.GetByIdAsync(groupId);
-                if (group == null)
-                {
-                    return ServiceResult<GroupDto>.Failure("Group not found");
-                }
+            var group = await _groupRepository.GetByIdAsync(groupId);
+            if (group == null)
+                return ServiceResult<GroupDto>.NotFoundResult("Group not found");
 
-                var groupDto = await MapToGroupDtoAsync(group);
-                return ServiceResult<GroupDto>.SuccessResult(groupDto);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<GroupDto>.Failure($"Error retrieving group: {ex.Message}");
-            }
+            var groupDto = await MapToGroupDtoAsync(group);
+            return ServiceResult<GroupDto>.SuccessResult(groupDto);
         }
 
         public async Task<ServiceResult<List<GroupDto>>> GetGroupsForUserAsync(long userId)
         {
-            try
-            {
-                var groups = await _groupRepository.GetGroupsByUserIdAsync(userId);
-                var groupDtos = new List<GroupDto>();
-                foreach (var g in groups)
-                {
-                    groupDtos.Add(await MapToGroupDtoAsync(g, userId));
-                }
-                return ServiceResult<List<GroupDto>>.SuccessResult(groupDtos);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<List<GroupDto>>.Failure($"Error retrieving groups: {ex.Message}");
-            }
+            var groups = await _groupRepository.GetGroupsByUserIdAsync(userId);
+            var groupDtos = new List<GroupDto>();
+            foreach (var g in groups)
+                groupDtos.Add(await MapToGroupDtoAsync(g, userId));
+
+            return ServiceResult<List<GroupDto>>.SuccessResult(groupDtos);
         }
 
         public async Task<ServiceResult<GroupMessageDto>> SendGroupMessageAsync(long senderId, SendGroupMessageDto dto)
         {
-            try
+            // Kiểm tra người dùng có là thành viên không (gửi tin nhắn)
+            var isMember = await _groupMemberRepository.IsMemberAsync(dto.GroupId, senderId);
+            if (!isMember)
+                return ServiceResult<GroupMessageDto>.FailResult("You are not a member of this group");
+
+            var message = new GroupMessage
             {
-                // Verify user is a member
-                var isMember = await _groupMemberRepository.IsMemberAsync(dto.GroupId, senderId);
-                if (!isMember)
-                {
-                    return ServiceResult<GroupMessageDto>.Failure("You are not a member of this group");
-                }
+                GroupId = dto.GroupId,
+                SenderId = senderId,
+                Content = dto.Content,
+                MessageType = dto.MessageType,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                var message = new GroupMessage
-                {
-                    GroupId = dto.GroupId,
-                    SenderId = senderId,
-                    Content = dto.Content,
-                    MessageType = dto.MessageType,
-                    CreatedAt = DateTime.UtcNow
-                };
+            await _groupMessageRepository.AddAsync(message);
+            await _unitOfWork.SaveChangesAsync();
 
-                await _groupMessageRepository.AddAsync(message);
-                await _unitOfWork.SaveChangesAsync();
+            // Tải lại để lấy navigation properties (thông tin người gửi)
+            var savedMessage = await _groupMessageRepository.GetByIdWithSenderAsync(message.Id);
+            if (savedMessage == null)
+                return ServiceResult<GroupMessageDto>.FailResult("Failed to retrieve sent message");
 
-                // Reload to get navigation properties (sender info)
-                var savedMessage = await _groupMessageRepository.GetByIdWithSenderAsync(message.Id);
-                if (savedMessage == null)
-                {
-                    return ServiceResult<GroupMessageDto>.Failure("Failed to retrieve sent message");
-                }
-
-                var messageDto = MapToGroupMessageDto(savedMessage);
-                return ServiceResult<GroupMessageDto>.SuccessResult(messageDto);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<GroupMessageDto>.Failure($"Error sending message: {ex.Message}");
-            }
+            var messageDto = MapToGroupMessageDto(savedMessage);
+            return ServiceResult<GroupMessageDto>.SuccessResult(messageDto);
         }
 
         public async Task<ServiceResult<object>> GetGroupMessagesAsync(long groupId, long userId, int pageNumber = 1, int pageSize = 50)
         {
-            try
+            // Kiểm tra quyền truy cập của người dùng vào nhóm
+            var isMember = await _groupMemberRepository.IsMemberAsync(groupId, userId);
+            if (!isMember)
+                return ServiceResult<object>.FailResult("You do not have access to this group");
+
+            var totalCount = await _groupMessageRepository.GetMessageCountAsync(groupId);
+            var messages = await _groupMessageRepository.GetMessagesByGroupIdAsync(groupId, pageNumber, pageSize);
+            var messageDtos = messages.Select(MapToGroupMessageDto).ToList();
+
+            var result = new
             {
-                // Verify user has access
-                var isMember = await _groupMemberRepository.IsMemberAsync(groupId, userId);
-                if (!isMember)
-                {
-                    return ServiceResult<object>.Failure("You do not have access to this group");
-                }
+                Messages = messageDtos,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                HasMore = (pageNumber * pageSize) < totalCount
+            };
 
-                var totalCount = await _groupMessageRepository.GetMessageCountAsync(groupId);
-                var messages = await _groupMessageRepository.GetMessagesByGroupIdAsync(groupId, pageNumber, pageSize);
-                var messageDtos = messages.Select(MapToGroupMessageDto).ToList();
-
-                var result = new
-                {
-                    Messages = messageDtos,
-                    TotalCount = totalCount,
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    HasMore = (pageNumber * pageSize) < totalCount
-                };
-
-                return ServiceResult<object>.SuccessResult(result);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<object>.Failure($"Error retrieving messages: {ex.Message}");
-            }
+            return ServiceResult<object>.SuccessResult(result);
         }
 
         public async Task<ServiceResult<bool>> UserHasAccessToGroupAsync(long userId, long groupId)
         {
-            try
-            {
-                var isMember = await _groupMemberRepository.IsMemberAsync(groupId, userId);
-                return ServiceResult<bool>.SuccessResult(isMember);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<bool>.Failure($"Error checking access: {ex.Message}");
-            }
+            var isMember = await _groupMemberRepository.IsMemberAsync(groupId, userId);
+            return ServiceResult<bool>.SuccessResult(isMember);
         }
 
         public async Task<ServiceResult<bool>> LeaveGroupAsync(long userId, long groupId)
         {
-            try
+            var member = await _groupMemberRepository.GetMemberAsync(groupId, userId);
+            if (member == null)
+                return ServiceResult<bool>.FailResult("You are not a member of this group");
+
+            // Ngăn admin (mentor) rời khỏi nhóm
+            if (member.Role == GroupRole.Admin)
+                return ServiceResult<bool>.FailResult("Group admin cannot leave the group");
+
+            // Lấy tên người dùng cho tin nhắn hệ thống (rời nhóm)
+            var userName = member.User?.UserProfile?.FullName ?? member.User?.Email ?? "Unknown";
+
+            // Tạo tin nhắn hệ thống trước khi xóa thành viên
+            var systemMessage = new GroupMessage
             {
-                var member = await _groupMemberRepository.GetMemberAsync(groupId, userId);
-                if (member == null)
-                {
-                    return ServiceResult<bool>.Failure("You are not a member of this group");
-                }
+                GroupId = groupId,
+                SenderId = userId,
+                Content = $"{userName} left the group",
+                MessageType = MessageType.System,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _groupMessageRepository.AddAsync(systemMessage);
 
-                // Prevent admin (mentor) from leaving
-                if (member.Role == GroupRole.Admin)
-                {
-                    return ServiceResult<bool>.Failure("Group admin cannot leave the group");
-                }
+            await _groupMemberRepository.DeleteAsync(member);
+            await _unitOfWork.SaveChangesAsync();
 
-                // Get user name for system message
-                var userName = member.User?.UserProfile?.FullName ?? member.User?.Email ?? "Unknown";
-
-                // Create system message before removing member
-                var systemMessage = new GroupMessage
-                {
-                    GroupId = groupId,
-                    SenderId = userId,
-                    Content = $"{userName} left the group",
-                    MessageType = MessageType.System,
-                    CreatedAt = DateTime.UtcNow
-                };
-                await _groupMessageRepository.AddAsync(systemMessage);
-
-                await _groupMemberRepository.DeleteAsync(member);
-                await _unitOfWork.SaveChangesAsync();
-
-                return ServiceResult<bool>.SuccessResult(true);
-            }
-            catch (Exception ex)
-            {
-                return ServiceResult<bool>.Failure($"Error leaving group: {ex.Message}");
-            }
+            return ServiceResult<bool>.SuccessResult(true);
         }
 
         #region Private Helper Methods
@@ -430,39 +371,33 @@ namespace MentorEdu.Services.Implementations
             return inviteCode;
         }
 
-        private string GenerateRandomCode(int length)
+        private static string GenerateRandomCode(int length)
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var random = new Random();
             return new string(Enumerable.Repeat(chars, length)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+                .Select(s => s[Random.Shared.Next(s.Length)]).ToArray());
         }
 
         private async Task<GroupDto> MapToGroupDtoAsync(Group group, long? userId = null)
         {
-            Console.WriteLine($"[MapToGroupDto] Starting - GroupId: {group?.Id}, Name: {group?.Name}");
-            Console.WriteLine($"[MapToGroupDto] Mentor: {(group?.Mentor != null ? "not null" : "NULL")}");
-            Console.WriteLine($"[MapToGroupDto] Mentor.UserProfile: {(group?.Mentor?.UserProfile != null ? "not null" : "NULL")}");
-            Console.WriteLine($"[MapToGroupDto] Members count: {group?.Members?.Count ?? 0}");
-            
-            // Get latest message for preview
+            // Lấy tin nhắn mới nhất để hiển thị preview
             var latestMessage = await _groupMessageRepository.GetLatestMessageByGroupIdAsync(group.Id);
             
-            // Format lastMessage based on messageType
-            string displayMessage = latestMessage?.Content;
+            // Định dạng hiển thị tin nhắn cuối dựa theo loại tin nhắn
+            string? displayMessage = latestMessage?.Content;
             if (latestMessage != null)
             {
                 if (latestMessage.MessageType == MentorEdu.Models.Enums.MessageType.Image)
                 {
-                    displayMessage = "📷 Photo";
+                    displayMessage = "Photo";
                 }
                 else if (latestMessage.MessageType == MentorEdu.Models.Enums.MessageType.File)
                 {
-                    displayMessage = "📄 File";
+                    displayMessage = "File";
                 }
             }
 
-            // Compute unread count if userId is provided
+            // Tính số tin nhắn chưa đọc nếu có userId
             int unreadCount = 0;
             if (userId.HasValue)
             {

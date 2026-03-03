@@ -7,19 +7,19 @@ namespace MentorEdu.Services.Interfaces
 {
     public interface IMentorService
     {
-        // Search & Filter
+        // Tìm kiếm & Lọc
         Task<ServiceResult<PagedResponse<MentorListDto>>> SearchMentorsAsync(SearchMentorRequest request);
         Task<ServiceResult<List<MentorListDto>>> GetTopMentorsAsync(int count = 10);
         Task<ServiceResult<List<MentorListDto>>> GetMentorsByCategoryAsync(long categoryId);
         
-        // Detail
+        // Chi tiết
         Task<ServiceResult<UserDetailDto>> GetMentorDetailAsync(long mentorId);
         
-        // Reviews
+        // Đánh giá
         Task<ServiceResult<PagedResponse<MentorReviewDto>>> GetMentorReviewsAsync(long mentorId, int pageNumber, int pageSize);
         Task<ServiceResult<ReviewSummaryDto>> GetMentorReviewSummaryAsync(long mentorId);
 
-        // Mentor Application Flow
+        // Quy trình đăng ký mentor
         Task<ServiceResult> ApplyAsMentorAsync(long userId, ApplyAsMentorRequest request);
         Task<ServiceResult<MentorApplicationStatusDto>> GetApplicationStatusAsync(long userId);
         Task<ServiceResult> ConfirmSwitchToMentorAsync(long userId);

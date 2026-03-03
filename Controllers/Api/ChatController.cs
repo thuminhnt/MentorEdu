@@ -20,7 +20,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user's conversations
+        /// Lấy danh sách cuộc hội thoại của người dùng hiện tại
         /// </summary>
         [HttpGet("conversations")]
         public async Task<ActionResult<ApiResponse<List<ConversationListDto>>>> GetConversations()
@@ -35,7 +35,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get conversation detail and messages
+        /// Lấy chi tiết cuộc hội thoại và tin nhắn
         /// </summary>
         [HttpGet("conversations/{conversationId}")]
         public async Task<ActionResult<ApiResponse<ConversationDetailDto>>> GetConversation(long conversationId)
@@ -56,7 +56,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create or get conversation with another user
+        /// Tạo hoặc lấy cuộc hội thoại với người dùng khác
         /// </summary>
         [HttpPost("conversations")]
         public async Task<ActionResult<ApiResponse<ConversationDetailDto>>> CreateOrGetConversation([FromBody] CreateConversationDto request)
@@ -71,7 +71,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get messages of a conversation (paginated)
+        /// Lấy tin nhắn của cuộc hội thoại (có phân trang)
         /// </summary>
         [HttpGet("conversations/{conversationId}/messages")]
         public async Task<ActionResult<ApiResponse<PagedResponse<MessageDto>>>> GetMessages(
@@ -95,7 +95,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Send a message (alternative to SignalR)
+        /// Gửi tin nhắn (thay thế cho SignalR)
         /// </summary>
         [HttpPost("conversations/{conversationId}/messages")]
         public async Task<ActionResult<ApiResponse<MessageDto>>> SendMessage(
@@ -118,7 +118,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Mark messages as read
+        /// Đánh dấu tin nhắn đã đọc
         /// </summary>
         [HttpPost("conversations/{conversationId}/read")]
         public async Task<ActionResult<ApiResponse>> MarkAsRead(long conversationId)
@@ -135,7 +135,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get unread message count
+        /// Lấy số lượng tin nhắn chưa đọc
         /// </summary>
         [HttpGet("unread-count")]
         public async Task<ActionResult<ApiResponse<int>>> GetUnreadCount()

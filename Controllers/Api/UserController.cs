@@ -21,7 +21,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user profile
+        /// Lấy thông tin hồ sơ người dùng hiện tại
         /// </summary>
         [HttpGet("profile")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> GetProfile()
@@ -36,7 +36,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get user by ID
+        /// Lấy thông tin người dùng theo ID
         /// </summary>
         [HttpGet("{userId}")]
         [AllowAnonymous]
@@ -51,7 +51,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update user profile
+        /// Cập nhật hồ sơ người dùng
         /// </summary>
         [HttpPut("profile")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> UpdateProfile([FromBody] UpdateUserProfileRequest request)
@@ -69,7 +69,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update mentor profile (for mentors only)
+        /// Cập nhật hồ sơ mentor (chỉ dành cho mentor)
         /// </summary>
         [HttpPut("mentor-profile")]
         public async Task<ActionResult<ApiResponse<UserDetailDto>>> UpdateMentorProfile([FromBody] UpdateMentorProfileRequest request)
@@ -87,7 +87,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update avatar
+        /// Cập nhật ảnh đại diện
         /// </summary>
         [HttpPut("avatar")]
         public async Task<ActionResult<ApiResponse<string>>> UpdateAvatar([FromBody] UpdateAvatarRequest request)
@@ -102,7 +102,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Deactivate current user account
+        /// Vô hiệu hóa tài khoản người dùng hiện tại
         /// </summary>
         [HttpPost("deactivate")]
         public async Task<ActionResult<ApiResponse>> DeactivateAccount()
@@ -117,7 +117,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Delete current user account
+        /// Xóa tài khoản người dùng hiện tại
         /// </summary>
         [HttpDelete("account")]
         public async Task<ActionResult<ApiResponse>> DeleteAccount()
@@ -132,8 +132,8 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Apply to become a mentor (from profile page)
-        /// Requires: Specialization, ExperienceYears, Introduction, PortfolioUrl, CertificationUrls
+        /// Nộp hồ sơ đăng ký trở thành mentor (từ trang hồ sơ)
+        /// Yêu cầu: Chuyên ngành, Số năm kinh nghiệm, Giới thiệu, PortfolioUrl, CertificationUrls
         /// </summary>
         [HttpPost("apply-mentor")]
         public async Task<ActionResult<ApiResponse>> ApplyAsMentor([FromBody] ApplyAsMentorRequest request)
@@ -151,7 +151,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get mentor application status for current user
+        /// Lấy trạng thái đăng ký mentor của người dùng hiện tại
         /// </summary>
         [HttpGet("mentor-application-status")]
         public async Task<ActionResult<ApiResponse<MentorApplicationStatusDto>>> GetMentorApplicationStatus()
@@ -166,7 +166,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create a report (report a user or review)
+        /// Tạo báo cáo (báo cáo người dùng hoặc đánh giá)
         /// </summary>
         [HttpPost("reports")]
         public async Task<ActionResult<ApiResponse<ReportDto>>> CreateReport([FromBody] CreateReportDto request)

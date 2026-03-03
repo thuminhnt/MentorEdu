@@ -1,7 +1,7 @@
 ﻿namespace MentorEdu.Services.Common
 {
     /// <summary>
-    /// Service result wrapper
+    /// Wrapper kết quả trả về từ service
     /// </summary>
     public class ServiceResult<T>
     {
@@ -91,7 +91,7 @@
     }
 
     /// <summary>
-    /// Service Result without data
+    /// Kết quả service không có dữ liệu
     /// </summary>
     public class ServiceResult
     {

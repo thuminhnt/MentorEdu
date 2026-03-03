@@ -14,8 +14,8 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult> DeleteNotificationAsync(long notificationId, long userId);
         
         /// <summary>
-        /// Notify mentors with matching specializations when a post contains relevant category or hashtags.
-        /// Flow: CategoryId/Hashtags → MentorCategory/MentorHashtag → Mentor → Notification
+        /// Thông báo cho các mentor có chuyên môn phù hợp khi bài viết có danh mục hoặc hashtag liên quan.
+        /// Luồng: CategoryId/Hashtags → MentorCategory/MentorHashtag → Mentor → Thông báo
         /// </summary>
         Task<ServiceResult> NotifyMentorsAboutRelevantPostAsync(long postId, long? categoryId, List<string> hashtags);
     }

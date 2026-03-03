@@ -9,6 +9,7 @@ namespace MentorEdu.Controllers.Api
     public class FileController : ControllerBase
     {
         private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<FileController> _logger;
         private const long MaxFileSize = 20 * 1024 * 1024; // 20MB
         private const int MaxFiles = 2;
         private readonly string[] AllowedExtensions = { ".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx" };
@@ -17,13 +18,14 @@ namespace MentorEdu.Controllers.Api
         private const long MaxChatFileSize = 20 * 1024 * 1024; // 20MB
         private const int MaxChatFiles = 5;
 
-        public FileController(IWebHostEnvironment environment)
+        public FileController(IWebHostEnvironment environment, ILogger<FileController> logger)
         {
             _environment = environment;
+            _logger = logger;
         }
 
         /// <summary>
-        /// Upload certification files for mentor application (max 20MB, 2 files)
+        /// Tải lên file chứng chỉ để đăng ký mentor (tối đa 20MB, 2 file)
         /// </summary>
         [HttpPost("upload/certifications")]
         [AllowAnonymous] // Allow during registration
@@ -101,7 +103,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Upload avatar/profile picture (max 5MB)
+        /// Tải lên ảnh đại diện (tối đa 5MB)
         /// </summary>
         [HttpPost("upload/avatar")]
         [Authorize]
@@ -145,14 +147,13 @@ namespace MentorEdu.Controllers.Api
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ApiResponse<UploadResult>.FailResponse($"Upload failed: {ex.Message}"));
+                _logger.LogError(ex, "Avatar upload failed");
+                return StatusCode(500, ApiResponse<UploadResult>.FailResponse("Upload failed. Please try again."));
             }
-
-
         }
 
         /// <summary>
-        /// Upload chat image (max 10MB)
+        /// Tải lên ảnh chat (tối đa 10MB)
         /// </summary>
         [HttpPost("upload/chat-image")]
         [Authorize]
@@ -196,18 +197,25 @@ namespace MentorEdu.Controllers.Api
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ApiResponse<UploadResult>.FailResponse($"Upload failed: {ex.Message}"));
+                _logger.LogError(ex, "Chat image upload failed");
+                return StatusCode(500, ApiResponse<UploadResult>.FailResponse("Upload failed. Please try again."));
             }
         }
 
         /// <summary>
-        /// Upload chat files (images and documents) in a single request (max 20MB each, 5 files)
+        /// Tải lên file chat (hình ảnh và tài liệu) trong một yêu cầu (tối đa 20MB mỗi file, 5 file)
         /// </summary>
         [HttpPost("upload/chat-files")]
         [Authorize]
         [RequestSizeLimit(120 * 1024 * 1024)]
         public async Task<ActionResult<ApiResponse<UploadResult>>> UploadChatFiles([FromForm] List<IFormFile> files)
         {
+            if (files == null || files.Count == 0)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse("No files provided"));
+
+            if (files.Count > MaxChatFiles)
+                return BadRequest(ApiResponse<UploadResult>.FailResponse($"Maximum {MaxChatFiles} files allowed"));
+
             var allowedExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ".pdf", ".doc", ".docx", ".xls", ".xlsx",
@@ -221,11 +229,6 @@ namespace MentorEdu.Controllers.Api
                 if (string.IsNullOrWhiteSpace(ext) || !allowedExts.Contains(ext))
                     return BadRequest(ApiResponse<object>.FailResponse($"File type not allowed: {ext}"));
             }
-            if (files == null || files.Count == 0)
-                return BadRequest(ApiResponse<UploadResult>.FailResponse("No files provided"));
-
-            if (files.Count > MaxChatFiles)
-                return BadRequest(ApiResponse<UploadResult>.FailResponse($"Maximum {MaxChatFiles} files allowed"));
 
             var uploadedUrls = new List<string>();
             var errors = new List<string>();
@@ -286,7 +289,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Upload files for community posts (max 10MB each, 2 files)
+        /// Tải lên file cho bài đăng cộng đồng (tối đa 10MB mỗi file, 2 file)
         /// </summary>
         [HttpPost("upload/community-post")]
         [Authorize]

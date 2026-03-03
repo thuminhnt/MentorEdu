@@ -328,6 +328,8 @@ namespace MentorEdu.Services.Implementations
             string resultMessage = "Mentor application submitted successfully. Please wait for admin review.";
 
             // Use ExecuteWithStrategyAsync to properly handle transactions with retry strategy
+            try
+            {
             await _unitOfWork.ExecuteWithStrategyAsync(async () =>
             {
                 MentorProfile currentProfile;
@@ -447,10 +449,13 @@ namespace MentorEdu.Services.Implementations
                         historyReason = $"Auto-approved by AI (Score: {aiResult.ConfidenceScore}%). {aiResult.Reasoning}";
                         
                         // Auto-approve the application
+                        // Note: Do NOT call Update() here — the entity may be in Added state
+                        // (first-time application). Calling Update() would change state to Modified,
+                        // causing EF Core to generate UPDATE instead of INSERT → DbUpdateConcurrencyException.
+                        // EF Core's change tracker automatically detects property changes on tracked entities.
                         currentProfile.ApprovalStatus = MentorApprovalStatus.Approved;
                         currentProfile.ReviewedAt = DateTime.UtcNow;
                         currentProfile.UpdatedAt = DateTime.UtcNow;
-                        _unitOfWork.MentorProfiles.Update(currentProfile);
 
                         resultMessage = $"Congratulations! Your application has been automatically approved (AI Confidence: {aiResult.ConfidenceScore}%). Please go to your Profile to confirm switching to Mentor role.";
                     }
@@ -463,11 +468,11 @@ namespace MentorEdu.Services.Implementations
                         historyReason = $"Auto-rejected by AI (Score: {aiResult.ConfidenceScore}%). Concerns: {redFlagsText}";
                         
                         // Auto-reject the application
+                        // Note: Do NOT call Update() here — same reason as AUTO_APPROVE above.
                         currentProfile.ApprovalStatus = MentorApprovalStatus.Rejected;
                         currentProfile.RejectionReason = $"Your application was automatically reviewed. Concerns identified: {redFlagsText}. You may reapply with improved credentials.";
                         currentProfile.ReviewedAt = DateTime.UtcNow;
                         currentProfile.UpdatedAt = DateTime.UtcNow;
-                        _unitOfWork.MentorProfiles.Update(currentProfile);
 
                         resultMessage = $"Unfortunately, your application was not approved (AI Confidence: {aiResult.ConfidenceScore}%). Concerns: {redFlagsText}. You may reapply with improved credentials.";
                     }
@@ -535,6 +540,12 @@ namespace MentorEdu.Services.Implementations
 
                 await _unitOfWork.SaveChangesAsync();
             });
+            } // end try
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "ApplyAsMentorAsync failed for userId={UserId}. Exception: {Message}", userId, ex.ToString());
+                throw;
+            }
 
             // Send email notification based on AI decision (outside transaction)
             if (aiResult != null && user.UserProfile != null)

@@ -3,7 +3,7 @@ using MentorEdu.Models.Enums;
 namespace MentorEdu.DTOs.User
 {
     /// <summary>
-    /// DTO for mentor application status (shown in profile page)
+    /// DTO trạng thái đơn đăng ký mentor (hiển thị trong trang hồ sơ)
     /// </summary>
     public class MentorApplicationStatusDto
     {
@@ -14,7 +14,7 @@ namespace MentorEdu.DTOs.User
         public DateTime? ReviewedAt { get; set; }
         public string? RejectionReason { get; set; }
         
-        // Application details (if exists)
+        // Chi tiết đơn đăng ký (nếu tồn tại)
         public string? Specialization { get; set; }
         public int? ExperienceYears { get; set; }
     }

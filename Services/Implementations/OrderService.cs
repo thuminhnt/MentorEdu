@@ -12,8 +12,11 @@ namespace MentorEdu.Services.Implementations
 {
     public class OrderService : BaseService, IOrderService
     {
-        public OrderService(IUnitOfWork unitOfWork) : base(unitOfWork)
+        private readonly INotificationService _notificationService;
+
+        public OrderService(IUnitOfWork unitOfWork, INotificationService notificationService) : base(unitOfWork)
         {
+            _notificationService = notificationService;
         }
 
         #region Order Management
@@ -490,16 +493,34 @@ namespace MentorEdu.Services.Implementations
                 var mentorProfile = await _unitOfWork.MentorProfiles.GetByUserIdAsync(order.MentorId);
                 if (mentorProfile != null)
                 {
-                    var avgRating = await _unitOfWork.Reviews.GetAverageRatingByUserAsync(order.MentorId);
-                    var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ToUserId == order.MentorId);
-                    
-                    mentorProfile.RatingAvg = (decimal)avgRating;
-                    mentorProfile.RatingCount = reviewCount + 1;
+                    var existingAvg = await _unitOfWork.Reviews.GetAverageRatingByUserAsync(order.MentorId);
+                    var existingCount = await _unitOfWork.Reviews.CountAsync(r => r.ToUserId == order.MentorId);
+
+                    // Include the new review in the calculation before SaveChanges
+                    var newCount = existingCount + 1;
+                    var newAvg = ((double)existingAvg * existingCount + request.Rating) / newCount;
+
+                    mentorProfile.RatingAvg = (decimal)newAvg;
+                    mentorProfile.RatingCount = (int)newCount;
                     mentorProfile.UpdatedAt = DateTime.UtcNow;
                 }
             }
 
             await _unitOfWork.SaveChangesAsync();
+
+            // Notify mentor about the new review
+            if (toUserId == order.MentorId)
+            {
+                var reviewer = await _unitOfWork.Users.GetByIdWithProfilesAsync(userId);
+                var reviewerName = reviewer?.UserProfile?.FullName ?? reviewer?.Email ?? "A student";
+                await _notificationService.CreateNotificationAsync(
+                    order.MentorId,
+                    NotificationType.NewReview,
+                    "You received a new review",
+                    $"{reviewerName} gave you {request.Rating} star{(request.Rating == 1 ? "" : "s")}.",
+                    System.Text.Json.JsonSerializer.Serialize(new { orderId = order.Id, reviewId = review.Id })
+                );
+            }
 
             var dto = new ReviewDto
             {

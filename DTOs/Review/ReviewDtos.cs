@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace MentorEdu.DTOs.Review
 {
     /// <summary>
-    /// Review DTO
+    /// DTO Đánh giá
     /// </summary>
     public class ReviewDto
     {
@@ -13,12 +13,12 @@ namespace MentorEdu.DTOs.Review
         public string? Comment { get; set; }
         public DateTime? CreatedAt { get; set; }
 
-        // From User
+        // Từ người dùng
         public long FromUserId { get; set; }
         public string? FromUserName { get; set; }
         public string? FromUserAvatar { get; set; }
 
-        // To User
+        // Đến người dùng
         public long ToUserId { get; set; }
         public string? ToUserName { get; set; }
     }
@@ -38,12 +38,12 @@ namespace MentorEdu.DTOs.Review
         public string? StudentName { get; set; }
         public string? StudentAvatar { get; set; }
 
-        // Order info
+        // Thông tin đơn hàng
         public string? OrderTitle { get; set; }
     }
 
     /// <summary>
-    /// Review Summary
+    /// Tóm tắt đánh giá
     /// </summary>
     public class ReviewSummaryDto
     {
@@ -56,7 +56,7 @@ namespace MentorEdu.DTOs.Review
         public int TwoStarCount { get; set; }
         public int OneStarCount { get; set; }
 
-        // Percentage
+        // Tỷ lệ phần trăm
         public double FiveStarPercent => TotalReviews > 0 ? (double)FiveStarCount / TotalReviews * 100 : 0;
         public double FourStarPercent => TotalReviews > 0 ? (double)FourStarCount / TotalReviews * 100 : 0;
         public double ThreeStarPercent => TotalReviews > 0 ? (double)ThreeStarCount / TotalReviews * 100 : 0;
@@ -81,7 +81,7 @@ namespace MentorEdu.DTOs.Review
     }
 
     /// <summary>
-    /// Request filter reviews
+    /// Yêu cầu lọc đánh giá
     /// </summary>
     public class SearchReviewDto
     {

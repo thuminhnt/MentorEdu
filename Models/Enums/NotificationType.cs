@@ -18,6 +18,7 @@ namespace MentorEdu.Models.Enums
         RelevantPost,
         NewComment,
         NewFollower,
-        PostHidden
+        PostHidden,
+        NewReview
     }
 }

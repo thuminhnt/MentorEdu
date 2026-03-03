@@ -160,7 +160,7 @@ namespace MentorEdu.Services.Implementations
                 var category = await _unitOfWork.Categories.GetByIdAsync(categoryId.Value);
                 if (category != null)
                 {
-                    displayParts.Add(category.Name);
+                    displayParts.Add(category.Name ?? string.Empty);
                 }
             }
             if (hashtags != null && hashtags.Any())

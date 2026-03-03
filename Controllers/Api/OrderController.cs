@@ -22,7 +22,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get order by ID
+        /// Lấy đơn hàng theo ID
         /// </summary>
         [HttpGet("{orderId}")]
         public async Task<ActionResult<ApiResponse<OrderDetailDto>>> GetOrderById(long orderId)
@@ -37,7 +37,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user's orders (as student)
+        /// Lấy đơn hàng của người dùng hiện tại (với tư cách học viên)
         /// </summary>
         [HttpGet("my-orders/student")]
         public async Task<ActionResult<ApiResponse<PagedResponse<OrderListDto>>>> GetMyStudentOrders([FromQuery] SearchOrderDto request)
@@ -52,7 +52,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user's orders (as mentor)
+        /// Lấy đơn hàng của người dùng hiện tại (với tư cách mentor)
         /// </summary>
         [HttpGet("my-orders/mentor")]
         public async Task<ActionResult<ApiResponse<PagedResponse<OrderListDto>>>> GetMyMentorOrders([FromQuery] SearchOrderDto request)
@@ -67,7 +67,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Update order status
+        /// Cập nhật trạng thái đơn hàng
         /// </summary>
         [HttpPut("{orderId}/status")]
         public async Task<ActionResult<ApiResponse>> UpdateOrderStatus(long orderId, [FromBody] UpdateOrderStatusDto request)
@@ -82,7 +82,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Complete order (student only)
+        /// Hoàn thành đơn hàng (chỉ học viên)
         /// </summary>
         [HttpPost("{orderId}/complete")]
         public async Task<ActionResult<ApiResponse>> CompleteOrder(long orderId)
@@ -97,7 +97,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Cancel order
+        /// Hủy đơn hàng
         /// </summary>
         [HttpPost("{orderId}/cancel")]
         public async Task<ActionResult<ApiResponse>> CancelOrder(long orderId, [FromBody] CancelOrderRequest? request = null)
@@ -112,7 +112,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Create dispute for order
+        /// Tạo khiếu nại cho đơn hàng
         /// </summary>
         [HttpPost("{orderId}/dispute")]
         public async Task<ActionResult<ApiResponse>> DisputeOrder(long orderId, [FromBody] DisputeOrderRequest request)
@@ -132,7 +132,7 @@ namespace MentorEdu.Controllers.Api
         #region Work Sessions
 
         /// <summary>
-        /// Start work session (mentor only)
+        /// Bắt đầu phiên làm việc (chỉ mentor)
         /// </summary>
         [HttpPost("{orderId}/sessions/start")]
         public async Task<ActionResult<ApiResponse<WorkSessionDetailDto>>> StartWorkSession(long orderId)
@@ -147,7 +147,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// End work session (mentor only)
+        /// Kết thúc phiên làm việc (chỉ mentor)
         /// </summary>
         [HttpPost("sessions/{sessionId}/end")]
         public async Task<ActionResult<ApiResponse<WorkSessionDetailDto>>> EndWorkSession(long sessionId, [FromBody] EndSessionRequest? request = null)
@@ -166,7 +166,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Resume paused work session (mentor only)
+        /// Tiếp tục phiên làm việc đã tạm dừng (chỉ mentor)
         /// </summary>
         [HttpPost("sessions/{sessionId}/resume")]
         public async Task<ActionResult<ApiResponse<WorkSessionDetailDto>>> ResumeWorkSession(long sessionId)
@@ -181,7 +181,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get work session summary for an order
+        /// Lấy tóm tắt phiên làm việc của đơn hàng
         /// </summary>
         [HttpGet("{orderId}/sessions/summary")]
         public async Task<ActionResult<ApiResponse<WorkSessionSummaryDto>>> GetWorkSessionSummary(long orderId)
@@ -199,7 +199,7 @@ namespace MentorEdu.Controllers.Api
         #region Reviews
 
         /// <summary>
-        /// Create review for completed order
+        /// Tạo đánh giá cho đơn hàng đã hoàn thành
         /// </summary>
         [HttpPost("{orderId}/reviews")]
         public async Task<ActionResult<ApiResponse<ReviewDto>>> CreateReview(long orderId, [FromBody] CreateReviewRequest request)
@@ -222,7 +222,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get reviews for an order
+        /// Lấy đánh giá của đơn hàng
         /// </summary>
         [HttpGet("{orderId}/reviews")]
         public async Task<ActionResult<ApiResponse<List<ReviewDto>>>> GetOrderReviews(long orderId)

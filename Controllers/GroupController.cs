@@ -1,3 +1,4 @@
+using MentorEdu.DTOs.Common;
 using MentorEdu.DTOs.Groups;
 using MentorEdu.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -26,27 +27,13 @@ namespace MentorEdu.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateGroup([FromBody] CreateGroupDto dto)
         {
-            _logger.LogInformation("[GroupController] CreateGroup called");
             var userId = GetCurrentUserId();
-            _logger.LogInformation($"[GroupController] UserId: {userId}, Name: {dto?.Name}");
-            
-            if (userId == 0)
-            {
-                _logger.LogWarning("[GroupController] Unauthorized: userId = 0");
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             var result = await _groupService.CreateGroupAsync(userId, dto);
-            _logger.LogInformation($"[GroupController] Service result: Success={result.Success}, Message={result.Message}");
-            
-            if (!result.Success)
-            {
-                _logger.LogWarning($"[GroupController] Failed to create group: {result.Message}");
-                return BadRequest(new { message = result.Message });
-            }
 
-            _logger.LogInformation($"[GroupController] Group created successfully: {result.Data?.Id}");
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<GroupDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<GroupDto>.SuccessResponse(result.Data!));
         }
 
         /// <summary>
@@ -56,18 +43,12 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> JoinGroup(string inviteCode)
         {
             var userId = GetCurrentUserId();
-            if (userId == 0)
-            {
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             var result = await _groupService.JoinGroupAsync(userId, inviteCode);
-            if (!result.Success)
-            {
-                return BadRequest(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<GroupDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<GroupDto>.SuccessResponse(result.Data!));
         }
 
         /// <summary>
@@ -77,12 +58,11 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> GetGroup(long groupId)
         {
             var result = await _groupService.GetGroupByIdAsync(groupId);
-            if (!result.Success)
-            {
-                return NotFound(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<GroupDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<GroupDto>.SuccessResponse(result.Data!));
         }
 
         /// <summary>
@@ -92,18 +72,12 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> GetMyGroups()
         {
             var userId = GetCurrentUserId();
-            if (userId == 0)
-            {
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             var result = await _groupService.GetGroupsForUserAsync(userId);
-            if (!result.Success)
-            {
-                return BadRequest(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<List<GroupDto>>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<List<GroupDto>>.SuccessResponse(result.Data!));
         }
 
         /// <summary>
@@ -113,18 +87,12 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> GetGroupMessages(long groupId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50)
         {
             var userId = GetCurrentUserId();
-            if (userId == 0)
-            {
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             var result = await _groupService.GetGroupMessagesAsync(groupId, userId, pageNumber, pageSize);
-            if (!result.Success)
-            {
-                return BadRequest(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<object>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<object>.SuccessResponse(result.Data!));
         }
 
         /// <summary>
@@ -134,18 +102,12 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> LeaveGroup(long groupId)
         {
             var userId = GetCurrentUserId();
-            if (userId == 0)
-            {
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             var result = await _groupService.LeaveGroupAsync(userId, groupId);
-            if (!result.Success)
-            {
-                return BadRequest(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<bool>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<bool>.SuccessResponse(result.Data));
         }
 
         /// <summary>
@@ -155,18 +117,12 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> AddMember(long groupId, long userId)
         {
             var adminId = GetCurrentUserId();
-            if (adminId == 0)
-            {
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             var result = await _groupService.AddMemberAsync(adminId, groupId, userId);
-            if (!result.Success)
-            {
-                return BadRequest(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<GroupDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<GroupDto>.SuccessResponse(result.Data!));
         }
 
         /// <summary>
@@ -176,19 +132,28 @@ namespace MentorEdu.Controllers
         public async Task<IActionResult> SendMessage(long groupId, [FromBody] SendGroupMessageDto dto)
         {
             var userId = GetCurrentUserId();
-            if (userId == 0)
-            {
-                return Unauthorized(new { message = "User not authenticated" });
-            }
-
             dto.GroupId = groupId;
             var result = await _groupService.SendGroupMessageAsync(userId, dto);
-            if (!result.Success)
-            {
-                return BadRequest(new { message = result.Message });
-            }
 
-            return Ok(result);
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<GroupMessageDto>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<GroupMessageDto>.SuccessResponse(result.Data!));
+        }
+
+        /// <summary>
+        /// Remove (kick) a member from group (Admin only)
+        /// </summary>
+        [HttpPost("{groupId}/members/{userId}/kick")]
+        public async Task<IActionResult> RemoveMember(long groupId, long userId)
+        {
+            var adminId = GetCurrentUserId();
+            var result = await _groupService.RemoveMemberAsync(adminId, groupId, userId);
+
+            if (!result.Success)
+                return StatusCode(result.StatusCode, ApiResponse<bool>.FailResponse(result.Message ?? ""));
+
+            return Ok(ApiResponse<bool>.SuccessResponse(result.Data));
         }
 
         private long GetCurrentUserId()

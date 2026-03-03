@@ -8,6 +8,7 @@ namespace MentorEdu.Services.Interfaces
         Task<ServiceResult<GroupDto>> CreateGroupAsync(long mentorId, CreateGroupDto dto);
         Task<ServiceResult<GroupDto>> JoinGroupAsync(long userId, string inviteCode);
         Task<ServiceResult<GroupDto>> AddMemberAsync(long adminId, long groupId, long userId);
+        Task<ServiceResult<bool>> RemoveMemberAsync(long adminId, long groupId, long userId);
         Task<ServiceResult<GroupDto>> GetGroupByIdAsync(long groupId);
         Task<ServiceResult<List<GroupDto>>> GetGroupsForUserAsync(long userId);
         Task<ServiceResult<GroupMessageDto>> SendGroupMessageAsync(long senderId, SendGroupMessageDto dto);

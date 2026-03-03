@@ -23,7 +23,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Ping test endpoint
+        /// Endpoint kiểm tra kết nối
         /// </summary>
         [HttpGet("ping")]
         [AllowAnonymous]
@@ -33,7 +33,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get current user's wallet
+        /// Lấy ví của người dùng hiện tại
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<WalletDto>>> GetWallet()
@@ -48,7 +48,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get wallet detail with recent transactions
+        /// Lấy chi tiết ví kèm giao dịch gần đây
         /// </summary>
         [HttpGet("detail")]
         public async Task<ActionResult<ApiResponse<WalletDetailDto>>> GetWalletDetail()
@@ -63,7 +63,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get wallet summary
+        /// Lấy tóm tắt ví
         /// </summary>
         [HttpGet("summary")]
         public async Task<ActionResult<ApiResponse<WalletSummaryDto>>> GetWalletSummary()
@@ -78,7 +78,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Top up wallet - creates MoMo payment and returns payment URL
+        /// Nạp tiền vào ví - tạo thanh toán MoMo và trả về URL thanh toán
         /// </summary>
         [HttpPost("topup")]
         public async Task<ActionResult<ApiResponse<TopupResponseDto>>> Topup([FromBody] TopupRequestDto request)
@@ -96,7 +96,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Process topup callback from payment gateway (generic)
+        /// Xử lý callback nạp tiền từ cổng thanh toán (tổng quát)
         /// </summary>
         [HttpPost("topup/callback")]
         [AllowAnonymous]
@@ -111,8 +111,8 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// MoMo IPN (Instant Payment Notification) callback
-        /// MoMo will POST to this endpoint after payment is completed
+        /// Callback IPN (Thông báo thanh toán tức thì) của MoMo
+        /// MoMo sẽ POST đến endpoint này sau khi thanh toán hoàn tất
         /// </summary>
         [HttpPost("momo/ipn")]
         [AllowAnonymous]
@@ -149,8 +149,8 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// VNPay IPN (Instant Payment Notification) callback
-        /// VNPay will GET to this endpoint after payment is completed
+        /// Callback IPN (Thông báo thanh toán tức thì) của VNPay
+        /// VNPay sẽ GET đến endpoint này sau khi thanh toán hoàn tất
         /// </summary>
         [HttpGet("vnpay/ipn")]
         [AllowAnonymous]
@@ -178,8 +178,8 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// VNPay Return URL - Verify VNPay payment from frontend
-        /// Frontend calls this after VNPay redirects back with query params
+        /// URL trả về của VNPay - Xác minh thanh toán VNPay từ frontend
+        /// Frontend gọi sau khi VNPay chuyển hướng về kèm query params
         /// </summary>
         [HttpGet("vnpay/return")]
         [AllowAnonymous]
@@ -214,7 +214,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Check transaction status by reference
+        /// Kiểm tra trạng thái giao dịch theo mã tham chiếu
         /// </summary>
         [HttpGet("topup/check/{transactionRef}")]
         public async Task<ActionResult<ApiResponse<TransactionDto>>> CheckTransactionStatus(string transactionRef)
@@ -228,7 +228,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Admin: Confirm bank transfer deposit
+        /// Admin: Xác nhận nạp tiền qua chuyển khoản ngân hàng
         /// </summary>
         [HttpPost("bank-transfer/confirm/{transactionRef}")]
         [Authorize(Roles = "Admin")]
@@ -244,7 +244,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Admin: Get pending bank transfer deposits
+        /// Admin: Lấy danh sách nạp tiền chuyển khoản đang chờ xử lý
         /// </summary>
         [HttpGet("bank-transfer/pending")]
         [Authorize(Roles = "Admin")]
@@ -260,7 +260,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Admin: Reject bank transfer deposit
+        /// Admin: Từ chối nạp tiền qua chuyển khoản ngân hàng
         /// </summary>
         [HttpPost("bank-transfer/reject/{transactionRef}")]
         [Authorize(Roles = "Admin")]
@@ -276,7 +276,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Request withdrawal
+        /// Yêu cầu rút tiền
         /// </summary>
         [HttpPost("withdraw")]
         public async Task<ActionResult<ApiResponse>> Withdraw([FromBody] WithdrawRequestDto request)
@@ -294,7 +294,7 @@ namespace MentorEdu.Controllers.Api
         }
 
         /// <summary>
-        /// Get transaction history
+        /// Lấy lịch sử giao dịch
         /// </summary>
         [HttpGet("transactions")]
         public async Task<ActionResult<ApiResponse<PagedResponse<TransactionDto>>>> GetTransactions([FromQuery] SearchTransactionDto request)

@@ -10,7 +10,7 @@ namespace MentorEdu.Services.Interfaces
 {
     public interface IAdminService
     {
-        // Dashboard Statistics
+        // Thống kê Dashboard
         Task<ServiceResult<AdminDashboardDto>> GetDashboardAsync();
 
         #region User Management
@@ -92,7 +92,7 @@ namespace MentorEdu.Services.Interfaces
 
         #region Hashtags Management
         Task<ServiceResult<PagedResponse<AdminHashtagDto>>> GetAllHashtagsAsync(AdminSearchHashtagDto request);
-        Task<ServiceResult<List<HashtagDto>>> GetHashtagsAsync(); // For public autocomplete
+        Task<ServiceResult<List<HashtagDto>>> GetHashtagsAsync(); // Dùng cho gợi ý tự động (công khai)
         Task<ServiceResult<AdminHashtagDto>> CreateHashtagAsync(CreateHashtagDto request);
         Task<ServiceResult> DeleteHashtagAsync(long hashtagId);
         #endregion
